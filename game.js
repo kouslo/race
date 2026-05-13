@@ -1592,9 +1592,7 @@ function updateCamera(dt) {
     sunFlareMat.opacity = 0.55 * sunAlign;
     flareGhostMat.opacity = 0.4 * sunAlign;
 
-    // ---- CSS post-fx driven by speed ----
-    const blur = Math.max(0, (state.speed - 35) / 8); // px
-    document.documentElement.style.setProperty("--motion-blur", `${Math.min(blur, 3.5).toFixed(2)}px`);
+    // Speed-driven vignette only (no canvas blur — that washed out the view)
     const speedlinesEl = document.getElementById("speedlines");
     if (speedlinesEl) speedlinesEl.classList.toggle("active", state.speed > 55);
 }

@@ -147,11 +147,6 @@ body {
 
 #speedlines.active { opacity: 1; }
 
-/* Motion blur applied to the canvas itself via filter, scales with --blur */
-#game {
-    will-change: filter;
-    filter: blur(var(--motion-blur, 0px));
-}
 
 #speedometer {
     position: absolute;
