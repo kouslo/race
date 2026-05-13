@@ -1837,13 +1837,17 @@ function updateCubeReflection() {
 // gap between obstacle rows, the absolute max throttle speed, the range
 // of possible block counts per row (more = scarier), a BGM tempo
 // multiplier, and a "heat" index that drives visual overlays.
+// Targeting 2-5 minute runs. Distance thresholds + per-stage gap/blocks
+// tuned so the average player dies around HYPER/INFERNO (3-5 min) while
+// early stages give space to learn (first 45-60 s in CRUISE/STEADY).
+// Speed is fixed per stage — no manual throttle.
 const STAGES = [
-    { name: "CRUISE",   minDist: 0,    base: 28, gap: 32, max: 65,  blocks: [1,1,2],     tempo: 1.0,  heat: 1 },
-    { name: "STEADY",   minDist: 300,  base: 36, gap: 26, max: 75,  blocks: [1,2,2],     tempo: 1.10, heat: 2 },
-    { name: "RAPID",    minDist: 800,  base: 46, gap: 22, max: 88,  blocks: [2,2,3],     tempo: 1.20, heat: 3 },
-    { name: "INSANE",   minDist: 1500, base: 58, gap: 18, max: 105, blocks: [2,3,3],     tempo: 1.35, heat: 4 },
-    { name: "HYPER",    minDist: 2400, base: 72, gap: 14, max: 125, blocks: [2,3,3,4],   tempo: 1.55, heat: 5 },
-    { name: "INFERNO",  minDist: 3500, base: 88, gap: 11, max: 150, blocks: [3,3,4,4],   tempo: 1.80, heat: 6 },
+    { name: "CRUISE",   minDist: 0,     base: 30, gap: 38, max: 30, blocks: [1,1,2],     tempo: 1.00, heat: 1 },
+    { name: "STEADY",   minDist: 1300,  base: 40, gap: 32, max: 40, blocks: [1,2,2],     tempo: 1.10, heat: 2 },
+    { name: "RAPID",    minDist: 3000,  base: 52, gap: 28, max: 52, blocks: [2,2,3],     tempo: 1.22, heat: 3 },
+    { name: "INSANE",   minDist: 5500,  base: 64, gap: 24, max: 64, blocks: [2,3,3],     tempo: 1.38, heat: 4 },
+    { name: "HYPER",    minDist: 8500,  base: 78, gap: 20, max: 78, blocks: [3,3,3,4],   tempo: 1.55, heat: 5 },
+    { name: "INFERNO",  minDist: 12000, base: 92, gap: 17, max: 92, blocks: [3,3,4,4],   tempo: 1.75, heat: 6 },
 ];
 
 function stageForDistance(d) {
@@ -2101,8 +2105,6 @@ window.addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
 function update(dt) {
     if (state.mode !== "playing") return;
 
-    const accelerating = keys["arrowup"] || keys["w"];
-    const reversing = keys["arrowdown"] || keys["s"];
     const boostHeld = keys["shift"];
 
     // ---- Nitro boost handling ----
@@ -2150,20 +2152,17 @@ function update(dt) {
     }
     const stage = STAGES[state.stageIdx];
 
-    // Speed control — modulated by per-car stats
+    // Speed locked to stage; no manual W/S throttle. Per-car stats only
+    // adjust the absolute pace (e.g. trucks roll slower at the same stage).
     const stageBase = stage.base * carStats.maxSpeedMult;
-    const stageMax = stage.max * carStats.maxSpeedMult;
-    if (accelerating) state.speed += state.accel * carStats.accelMult * dt;
-    else if (reversing) state.speed -= state.brake * dt;
-    else {
-        if (state.speed > stageBase) state.speed -= 6 * dt;
-        else if (state.speed < stageBase) state.speed += 6 * dt;
-    }
-    const effectiveMax = state.boostActive ? stageMax * state.boostMult : stageMax;
-    if (state.boostActive) {
-        state.speed += 80 * dt;
-    }
-    state.speed = Math.max(state.minSpeed, Math.min(effectiveMax, state.speed));
+    const boostTarget = stageBase * state.boostMult;
+    const target = state.boostActive ? boostTarget : stageBase;
+
+    // Smoothly converge to the target speed.
+    const upRate = state.boostActive ? 60 : 22;
+    const downRate = 36; // brisk return after boost ends or stage downshifts
+    if (state.speed < target) state.speed = Math.min(target, state.speed + upRate * carStats.accelMult * dt);
+    else if (state.speed > target) state.speed = Math.max(target, state.speed - downRate * dt);
 
     // Forward motion (car heads down +Z)
     car.position.z += state.speed * dt;
@@ -2181,8 +2180,8 @@ function update(dt) {
     const tilt = -xDelta * 0.06;
     car.rotation.z += (tilt - car.rotation.z) * Math.min(1, dt * 8);
 
-    // Slight nose-up/nose-down on throttle/brake
-    const pitch = accelerating ? -0.02 : reversing ? 0.03 : 0;
+    // Nose dips while boost ramps up (forward G-force feel)
+    const pitch = state.boostActive ? -0.03 : 0;
     car.rotation.x += (pitch - car.rotation.x) * Math.min(1, dt * 6);
 
     // Spin wheels
