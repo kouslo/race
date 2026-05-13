@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>레이싱 게임</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="game-container">
+    <div id="hud">
+        <div class="hud-item">속도: <span id="speed">0</span> km/h</div>
+        <div class="hud-item">랩: <span id="lap">1</span> / <span id="total-laps">3</span></div>
+        <div class="hud-item">시간: <span id="time">0.00</span>s</div>
+        <div class="hud-item">베스트: <span id="best">--</span></div>
+    </div>
+
+    <canvas id="game" width="900" height="600"></canvas>
+
+    <div id="overlay" class="overlay">
+        <div class="panel">
+            <h1>레이싱 게임</h1>
+            <p>방향키 또는 WASD로 차량을 조종하세요</p>
+            <ul class="controls">
+                <li><b>↑ / W</b> : 가속</li>
+                <li><b>↓ / S</b> : 후진 / 브레이크</li>
+                <li><b>← / A</b>, <b>→ / D</b> : 좌우 회전</li>
+                <li><b>Space</b> : 핸드 브레이크 (드리프트)</li>
+                <li><b>R</b> : 재시작</li>
+            </ul>
+            <button id="start-btn">출발!</button>
+        </div>
+    </div>
+
+    <div id="finish-overlay" class="overlay hidden">
+        <div class="panel">
+            <h1>완주!</h1>
+            <p>총 시간: <span id="final-time">0.00</span>초</p>
+            <p>베스트 랩: <span id="final-best">0.00</span>초</p>
+            <button id="restart-btn">다시 시작</button>
+        </div>
+    </div>
+</div>
+<script src="game.js"></script>
+</body>
+</html>
