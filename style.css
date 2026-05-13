@@ -88,6 +88,71 @@ body {
 
 #damage-flash.active { opacity: 1; transition: opacity 0.05s; }
 
+#stage-item {
+    transition: background 0.5s, box-shadow 0.5s, color 0.5s;
+}
+
+#stage-item.s1 { background: rgba(60,180,120,0.45); box-shadow: 0 0 0 1px rgba(120,255,180,0.5); }
+#stage-item.s2 { background: rgba(180,180,60,0.45); box-shadow: 0 0 0 1px rgba(255,255,150,0.6); }
+#stage-item.s3 { background: rgba(220,140,40,0.5);  box-shadow: 0 0 18px rgba(255,180,80,0.7); }
+#stage-item.s4 { background: rgba(220,80,40,0.6);   box-shadow: 0 0 22px rgba(255,120,60,0.8); }
+#stage-item.s5 { background: rgba(200,40,80,0.7);   box-shadow: 0 0 30px rgba(255,80,140,0.9); animation: shudder 0.4s infinite; }
+#stage-item.s6 { background: rgba(180,0,40,0.85);   box-shadow: 0 0 40px rgba(255,40,40,1);   animation: shudder 0.25s infinite; color: #fff; }
+
+@keyframes shudder {
+    0%, 100% { transform: translate(0,0); }
+    25%      { transform: translate(-1px, 1px); }
+    75%      { transform: translate(1px, -1px); }
+}
+
+#stage-banner {
+    position: absolute;
+    top: 35%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.7);
+    z-index: 30;
+    padding: 16px 60px;
+    font-size: 56px;
+    font-weight: 900;
+    letter-spacing: 6px;
+    color: #fff;
+    text-shadow: 0 0 24px currentColor, 0 0 60px currentColor;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s, transform 0.3s;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+#stage-banner.show {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+/* Hot-stage tint overlays */
+#postfx.hot3 #vignette { background:
+    radial-gradient(ellipse at center, transparent 45%, rgba(80,20,0,0.6) 100%),
+    linear-gradient(180deg, rgba(50,20,0,0.18) 0%, transparent 18%, transparent 80%, rgba(40,0,0,0.3) 100%); }
+#postfx.hot4 #vignette { background:
+    radial-gradient(ellipse at center, transparent 40%, rgba(120,20,0,0.7) 100%),
+    linear-gradient(180deg, rgba(80,20,0,0.22) 0%, transparent 18%, transparent 80%, rgba(80,0,0,0.4) 100%); }
+#postfx.hot5 #vignette { background:
+    radial-gradient(ellipse at center, transparent 35%, rgba(160,20,0,0.78) 100%),
+    linear-gradient(180deg, rgba(120,20,0,0.28) 0%, transparent 18%, transparent 80%, rgba(120,0,0,0.5) 100%); }
+#postfx.hot6 #vignette { background:
+    radial-gradient(ellipse at center, transparent 30%, rgba(200,20,0,0.85) 100%),
+    linear-gradient(180deg, rgba(160,20,0,0.32) 0%, transparent 18%, transparent 80%, rgba(160,0,0,0.6) 100%);
+    animation: rage 0.18s infinite; }
+#postfx.hot4 #chroma, #postfx.hot5 #chroma, #postfx.hot6 #chroma {
+    background:
+        radial-gradient(ellipse at 25% 50%, transparent 55%, rgba(255,60,60,0.12) 100%),
+        radial-gradient(ellipse at 75% 50%, transparent 55%, rgba(60,80,255,0.12) 100%);
+}
+
+@keyframes rage {
+    0%, 100% { filter: brightness(1); }
+    50%      { filter: brightness(1.15); }
+}
+
 #postfx {
     position: absolute;
     inset: 0;

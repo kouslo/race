@@ -846,9 +846,9 @@ function acquireObstacle(preferredType = null) {
     return null;
 }
 
-function spawnObstacleRow(z) {
-    // Block 1..3 lanes, picked randomly
-    const blockCount = 1 + Math.floor(Math.random() * 3);
+function spawnObstacleRow(z, blockCount = 1) {
+    // Block at most NUM_LANES - 1 so there's always at least one safe lane.
+    blockCount = Math.max(1, Math.min(NUM_LANES - 1, blockCount));
     const lanes = [0, 1, 2, 3, 4];
     for (let i = lanes.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -1282,15 +1282,34 @@ function updateCubeReflection() {
     cubeCam.update(renderer, scene);
 }
 
+// ---------- Stage system ----------
+// 6 escalating difficulty tiers. Each defines the auto-cruise speed, the
+// gap between obstacle rows, the absolute max throttle speed, the range
+// of possible block counts per row (more = scarier), a BGM tempo
+// multiplier, and a "heat" index that drives visual overlays.
+const STAGES = [
+    { name: "CRUISE",   minDist: 0,    base: 28, gap: 32, max: 65,  blocks: [1,1,2],     tempo: 1.0,  heat: 1 },
+    { name: "STEADY",   minDist: 300,  base: 36, gap: 26, max: 75,  blocks: [1,2,2],     tempo: 1.10, heat: 2 },
+    { name: "RAPID",    minDist: 800,  base: 46, gap: 22, max: 88,  blocks: [2,2,3],     tempo: 1.20, heat: 3 },
+    { name: "INSANE",   minDist: 1500, base: 58, gap: 18, max: 105, blocks: [2,3,3],     tempo: 1.35, heat: 4 },
+    { name: "HYPER",    minDist: 2400, base: 72, gap: 14, max: 125, blocks: [2,3,3,4],   tempo: 1.55, heat: 5 },
+    { name: "INFERNO",  minDist: 3500, base: 88, gap: 11, max: 150, blocks: [3,3,4,4],   tempo: 1.80, heat: 6 },
+];
+
+function stageForDistance(d) {
+    for (let i = STAGES.length - 1; i >= 0; i--) {
+        if (d >= STAGES[i].minDist) return i;
+    }
+    return 0;
+}
+
 // ---------- Game state ----------
 const state = {
     mode: "menu",
-    speed: 30,        // starts moving immediately
-    baseSpeed: 30,
-    minSpeed: 18,
-    maxSpeed: 70,
-    accel: 12,
-    brake: 30,
+    speed: 28,        // starts at stage 1 base
+    minSpeed: 16,
+    accel: 14,
+    brake: 32,
     cameraMode: 0,
     elapsed: 0,
     hp: 100,
@@ -1298,32 +1317,82 @@ const state = {
     distance: 0,
     topSpeed: 0,
     bestDistance: null,
-    currentLane: 2,   // middle lane
-    nextSpawnZ: 80,   // world z position for the next obstacle row
-    spawnGap: 28,     // distance between obstacle rows
+    currentLane: 2,
+    nextSpawnZ: 80,
+    stageIdx: 0,
 };
 
 function resetCar() {
     car.position.set(LANE_X[2], 0, 0);
     car.rotation.set(0, 0, 0);
     state.currentLane = 2;
-    state.speed = state.baseSpeed;
+    state.stageIdx = 0;
+    state.speed = STAGES[0].base;
     state.elapsed = 0;
     state.hp = state.maxHp;
     state.distance = 0;
     state.topSpeed = 0;
     state.nextSpawnZ = car.position.z + 80;
-    state.spawnGap = 28;
 
-    // clear obstacles
     for (const ob of obstaclePool) releaseObstacle(ob);
 
-    // reset road segment positions
     for (let i = 0; i < roadSegments.length; i++) {
         roadSegments[i].position.z = i * SEG_LENGTH - SEG_LENGTH;
     }
 
+    applyStageVisuals(0, true);
     updateHUD();
+}
+
+// Stage visual feedback (banner + HUD chip + post-fx tint + BGM tempo)
+const STAGE_COLORS = ["#4ce080", "#e0d24c", "#ff9020", "#ff5040", "#ff3070", "#ff2020"];
+const stageItemEl = document.getElementById("stage-item");
+const stageNumEl = document.getElementById("stage");
+const stageNameEl = document.getElementById("stage-name");
+const stageBannerEl = document.getElementById("stage-banner");
+const postFxEl = document.getElementById("postfx");
+
+function applyStageVisuals(idx, silent = false) {
+    const s = STAGES[idx];
+    // HUD chip class
+    for (let i = 1; i <= 6; i++) stageItemEl.classList.remove("s" + i);
+    stageItemEl.classList.add("s" + s.heat);
+    stageNumEl.textContent = idx + 1;
+    stageNameEl.textContent = s.name;
+
+    // Post-fx tint (heat 3+ adds increasing red wash)
+    postFxEl.classList.remove("hot3", "hot4", "hot5", "hot6");
+    if (s.heat >= 3) postFxEl.classList.add("hot" + s.heat);
+
+    // BGM tempo follows the stage
+    if (typeof bgm !== "undefined") bgm.tempoMult = s.tempo;
+
+    // Banner
+    if (!silent) {
+        stageBannerEl.textContent = `STAGE ${idx + 1} · ${s.name}`;
+        stageBannerEl.style.color = STAGE_COLORS[idx] || "#fff";
+        stageBannerEl.classList.add("show");
+        setTimeout(() => stageBannerEl.classList.remove("show"), 1400);
+        playStageJingle(s.heat);
+    }
+}
+
+function playStageJingle(heat) {
+    if (typeof bgm === "undefined" || !bgm.ctx) return;
+    const t = bgm.ctx.currentTime;
+    const base = 220 * Math.pow(2, (heat - 1) / 6);
+    [0, 0.08, 0.16].forEach((delay, i) => {
+        const o = bgm.ctx.createOscillator();
+        o.type = "sawtooth";
+        o.frequency.value = base * (1 + i * 0.5);
+        const g = bgm.ctx.createGain();
+        g.gain.setValueAtTime(0, t + delay);
+        g.gain.linearRampToValueAtTime(0.25, t + delay + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + delay + 0.4);
+        o.connect(g).connect(bgm.ctx.destination);
+        o.start(t + delay);
+        o.stop(t + delay + 0.45);
+    });
 }
 
 function flashDamage() {
@@ -1395,19 +1464,23 @@ function update(dt) {
     justPressed["arrowright"] = false;
     justPressed["d"] = false;
 
-    // Speed control
+    // Stage progression
+    const newStage = stageForDistance(state.distance);
+    if (newStage !== state.stageIdx) {
+        state.stageIdx = newStage;
+        applyStageVisuals(newStage);
+    }
+    const stage = STAGES[state.stageIdx];
+
+    // Speed control — base & max scale with stage
     if (accelerating) state.speed += state.accel * dt;
     else if (reversing) state.speed -= state.brake * dt;
     else {
-        // drift back toward base speed
-        if (state.speed > state.baseSpeed) state.speed -= 4 * dt;
-        else if (state.speed < state.baseSpeed) state.speed += 4 * dt;
+        // drift back toward stage base speed
+        if (state.speed > stage.base) state.speed -= 6 * dt;
+        else if (state.speed < stage.base) state.speed += 6 * dt;
     }
-    state.speed = Math.max(state.minSpeed, Math.min(state.maxSpeed, state.speed));
-
-    // Difficulty ramp: base speed slowly grows with distance
-    state.baseSpeed = Math.min(50, 30 + state.distance / 200);
-    state.spawnGap = Math.max(14, 28 - state.distance / 250);
+    state.speed = Math.max(state.minSpeed, Math.min(stage.max, state.speed));
 
     // Forward motion (car heads down +Z)
     car.position.z += state.speed * dt;
@@ -1463,10 +1536,13 @@ function update(dt) {
         }
     }
 
-    // Spawn obstacles ahead
-    while (state.nextSpawnZ < car.position.z + 220) {
-        spawnObstacleRow(state.nextSpawnZ);
-        state.nextSpawnZ += state.spawnGap + Math.random() * 8;
+    // Spawn obstacles ahead — gap shrinks per stage, block count climbs
+    while (state.nextSpawnZ < car.position.z + 240) {
+        const blockChoices = stage.blocks;
+        const blockCount = blockChoices[Math.floor(Math.random() * blockChoices.length)];
+        spawnObstacleRow(state.nextSpawnZ, blockCount);
+        const jitter = (Math.random() - 0.5) * stage.gap * 0.3;
+        state.nextSpawnZ += stage.gap + jitter;
     }
 
     // Collision detection + recycle obstacles behind
@@ -1668,6 +1744,7 @@ const bgm = {
     muted: false,
     timer: null,
     step: 0,
+    tempoMult: 1.0,
 };
 
 function startBGM() {
@@ -1850,7 +1927,7 @@ function startBGM() {
                 playLead(note(root + lm), nextStepTime, SIXTEENTH * 2.6, 0.14);
             }
 
-            nextStepTime += SIXTEENTH;
+            nextStepTime += SIXTEENTH / (bgm.tempoMult || 1);
             bgm.step++;
         }
     }
