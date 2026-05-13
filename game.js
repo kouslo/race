@@ -3,19 +3,25 @@
 
 // ---------- Setup ----------
 const canvas = document.getElementById("game");
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(window.devicePixelRatio);
+const renderer = new THREE.WebGLRenderer({
+    canvas,
+    antialias: true,
+    powerPreference: "high-performance",
+});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+// keep legacy lighting math so intensity values are straightforward multipliers
+if ("useLegacyLights" in renderer) renderer.useLegacyLights = true;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x88c5ff);
-scene.fog = new THREE.Fog(0x88c5ff, 200, 800);
+const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 4000);
 
-const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 2000);
+const MAX_ANISO = renderer.capabilities.getMaxAnisotropy();
 
 window.addEventListener("resize", () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -23,22 +29,120 @@ window.addEventListener("resize", () => {
     camera.updateProjectionMatrix();
 });
 
+// ---------- Sky ----------
+// Custom gradient sky dome with sun disc + atmospheric haze
+function buildSky() {
+    const skyGeo = new THREE.SphereGeometry(1500, 48, 32);
+    const skyMat = new THREE.ShaderMaterial({
+        uniforms: {
+            topColor:    { value: new THREE.Color(0x1a4a8a) },
+            midColor:    { value: new THREE.Color(0x6cb2f0) },
+            horizonCol:  { value: new THREE.Color(0xf2c98a) },
+            sunDir:      { value: new THREE.Vector3(0.45, 0.55, 0.7).normalize() },
+            sunColor:    { value: new THREE.Color(0xffe8b0) },
+            sunSize:     { value: 0.998 },
+            sunHaloSize: { value: 0.92 },
+        },
+        vertexShader: `
+            varying vec3 vWorldPos;
+            void main() {
+                vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `,
+        fragmentShader: `
+            uniform vec3 topColor;
+            uniform vec3 midColor;
+            uniform vec3 horizonCol;
+            uniform vec3 sunDir;
+            uniform vec3 sunColor;
+            uniform float sunSize;
+            uniform float sunHaloSize;
+            varying vec3 vWorldPos;
+            void main() {
+                vec3 dir = normalize(vWorldPos);
+                float h = clamp(dir.y, -0.2, 1.0);
+                vec3 col = mix(horizonCol, midColor, smoothstep(0.0, 0.35, h));
+                col = mix(col, topColor, smoothstep(0.3, 0.95, h));
+                float sd = dot(dir, normalize(sunDir));
+                float disc = smoothstep(sunSize, 1.0, sd);
+                float halo = smoothstep(sunHaloSize, 1.0, sd);
+                col += sunColor * disc * 4.0;
+                col += sunColor * halo * 0.35;
+                gl_FragColor = vec4(col, 1.0);
+            }
+        `,
+        side: THREE.BackSide,
+        depthWrite: false,
+    });
+    return new THREE.Mesh(skyGeo, skyMat);
+}
+const sky = buildSky();
+scene.add(sky);
+
+scene.fog = new THREE.FogExp2(0xaccfee, 0.0035);
+scene.background = new THREE.Color(0x6cb2f0);
+
 // ---------- Lighting ----------
-const hemi = new THREE.HemisphereLight(0xbcd6ff, 0x3a5a2a, 0.6);
+const hemi = new THREE.HemisphereLight(0xbcd6ff, 0x3a5a2a, 0.45);
 scene.add(hemi);
 
-const sun = new THREE.DirectionalLight(0xfff5e1, 1.2);
-sun.position.set(120, 200, 80);
+const sun = new THREE.DirectionalLight(0xfff2d5, 1.4);
+sun.position.set(90, 140, 110);
 sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
-sun.shadow.camera.left = -250;
-sun.shadow.camera.right = 250;
-sun.shadow.camera.top = 250;
-sun.shadow.camera.bottom = -250;
+sun.shadow.mapSize.set(4096, 4096);
+sun.shadow.camera.left = -120;
+sun.shadow.camera.right = 120;
+sun.shadow.camera.top = 120;
+sun.shadow.camera.bottom = -120;
 sun.shadow.camera.near = 1;
-sun.shadow.camera.far = 600;
-sun.shadow.bias = -0.0005;
+sun.shadow.camera.far = 500;
+sun.shadow.bias = -0.0002;
+sun.shadow.normalBias = 0.05;
+sun.shadow.radius = 3;
 scene.add(sun);
+scene.add(sun.target);
+
+// Cool rim/fill light from opposite side
+const fill = new THREE.DirectionalLight(0x88aacc, 0.35);
+fill.position.set(-100, 60, -80);
+scene.add(fill);
+
+// ---------- Environment map (for PBR reflections) ----------
+function buildEnvMap() {
+    // Procedural sky -> equirect texture -> PMREM
+    const size = 256;
+    const c = document.createElement("canvas");
+    c.width = size * 2; c.height = size;
+    const g = c.getContext("2d");
+    const grad = g.createLinearGradient(0, 0, 0, size);
+    grad.addColorStop(0.0, "#1a4a8a");
+    grad.addColorStop(0.45, "#6cb2f0");
+    grad.addColorStop(0.55, "#f2c98a");
+    grad.addColorStop(0.65, "#5a8a4a");
+    grad.addColorStop(1.0, "#1a2a1a");
+    g.fillStyle = grad;
+    g.fillRect(0, 0, size * 2, size);
+    // Sun spot
+    const sg = g.createRadialGradient(size * 1.3, size * 0.35, 0, size * 1.3, size * 0.35, size * 0.3);
+    sg.addColorStop(0, "rgba(255,240,200,1)");
+    sg.addColorStop(0.2, "rgba(255,210,150,0.7)");
+    sg.addColorStop(1, "rgba(255,210,150,0)");
+    g.fillStyle = sg;
+    g.fillRect(0, 0, size * 2, size);
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.mapping = THREE.EquirectangularReflectionMapping;
+    tex.colorSpace = THREE.SRGBColorSpace;
+
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    pmrem.compileEquirectangularShader();
+    const envRT = pmrem.fromEquirectangular(tex);
+    pmrem.dispose();
+    tex.dispose();
+    return envRT.texture;
+}
+scene.environment = buildEnvMap();
 
 // ---------- Road / Lanes ----------
 const NUM_LANES = 5;
@@ -56,28 +160,118 @@ const SEG_LENGTH = 40;
 const NUM_SEGS = 24;
 const ROAD_REPEAT = SEG_LENGTH * NUM_SEGS;
 
-function makeAsphaltTexture() {
+function makeAsphaltTextures() {
+    const SIZE = 512;
     const c = document.createElement("canvas");
-    c.width = 256; c.height = 256;
+    c.width = c.height = SIZE;
     const g = c.getContext("2d");
-    g.fillStyle = "#2e2e33";
-    g.fillRect(0, 0, 256, 256);
-    for (let i = 0; i < 4000; i++) {
-        const v = 30 + Math.random() * 50;
-        g.fillStyle = `rgb(${v},${v},${v + 3})`;
-        g.fillRect(Math.random() * 256, Math.random() * 256, 1, 1);
+
+    // Albedo
+    g.fillStyle = "#26262a";
+    g.fillRect(0, 0, SIZE, SIZE);
+    // Aggregate (small stones)
+    for (let i = 0; i < 18000; i++) {
+        const v = 20 + Math.random() * 50;
+        const r = Math.random() * 1.5 + 0.5;
+        g.fillStyle = `rgb(${v},${v},${v + Math.random() * 6})`;
+        g.beginPath();
+        g.arc(Math.random() * SIZE, Math.random() * SIZE, r, 0, Math.PI * 2);
+        g.fill();
     }
-    const tex = new THREE.CanvasTexture(c);
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(1, 4);
-    return tex;
+    // Long tire streaks
+    for (let i = 0; i < 30; i++) {
+        g.fillStyle = `rgba(${15 + Math.random() * 10}, ${15 + Math.random() * 10}, ${20 + Math.random() * 10}, 0.6)`;
+        g.fillRect(Math.random() * SIZE, 0, 0.6, SIZE);
+    }
+    // Subtle oil patches
+    for (let i = 0; i < 5; i++) {
+        const x = Math.random() * SIZE;
+        const y = Math.random() * SIZE;
+        const r = 30 + Math.random() * 50;
+        const rg = g.createRadialGradient(x, y, 0, x, y, r);
+        rg.addColorStop(0, "rgba(10,10,20,0.6)");
+        rg.addColorStop(1, "rgba(10,10,20,0)");
+        g.fillStyle = rg;
+        g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+    }
+    const albedo = new THREE.CanvasTexture(c);
+    albedo.wrapS = albedo.wrapT = THREE.RepeatWrapping;
+    albedo.repeat.set(2, 8);
+    albedo.anisotropy = MAX_ANISO;
+    albedo.colorSpace = THREE.SRGBColorSpace;
+
+    // Normal map — derive bumps from grayscale brightness
+    const nc = document.createElement("canvas");
+    nc.width = nc.height = SIZE;
+    const ng = nc.getContext("2d");
+    const img = g.getImageData(0, 0, SIZE, SIZE).data;
+    const out = ng.createImageData(SIZE, SIZE);
+    const odata = out.data;
+    function lum(x, y) {
+        x = (x + SIZE) % SIZE; y = (y + SIZE) % SIZE;
+        const idx = (y * SIZE + x) * 4;
+        return (img[idx] + img[idx + 1] + img[idx + 2]) / 3;
+    }
+    for (let y = 0; y < SIZE; y++) {
+        for (let x = 0; x < SIZE; x++) {
+            const dx = (lum(x + 1, y) - lum(x - 1, y)) / 255;
+            const dy = (lum(x, y + 1) - lum(x, y - 1)) / 255;
+            const nx = -dx * 2.5;
+            const ny = -dy * 2.5;
+            const nz = 1.0;
+            const len = Math.hypot(nx, ny, nz);
+            const idx = (y * SIZE + x) * 4;
+            odata[idx]     = Math.round((nx / len * 0.5 + 0.5) * 255);
+            odata[idx + 1] = Math.round((ny / len * 0.5 + 0.5) * 255);
+            odata[idx + 2] = Math.round((nz / len * 0.5 + 0.5) * 255);
+            odata[idx + 3] = 255;
+        }
+    }
+    ng.putImageData(out, 0, 0);
+    const normal = new THREE.CanvasTexture(nc);
+    normal.wrapS = normal.wrapT = THREE.RepeatWrapping;
+    normal.repeat.set(2, 8);
+    normal.anisotropy = MAX_ANISO;
+
+    return { albedo, normal };
 }
 
-const asphaltTex = makeAsphaltTexture();
-const roadMat = new THREE.MeshStandardMaterial({ map: asphaltTex, color: 0x404045, roughness: 0.95, metalness: 0.05 });
-const shoulderMat = new THREE.MeshStandardMaterial({ color: 0x2a2a30, roughness: 1 });
-const grassMat = new THREE.MeshStandardMaterial({ color: 0x3d6b2f, roughness: 1 });
+const asphalt = makeAsphaltTextures();
+const roadMat = new THREE.MeshPhysicalMaterial({
+    map: asphalt.albedo,
+    normalMap: asphalt.normal,
+    normalScale: new THREE.Vector2(0.7, 0.7),
+    color: 0x4a4a52,
+    roughness: 0.78,
+    metalness: 0.0,
+    clearcoat: 0.15,
+    clearcoatRoughness: 0.45,
+    envMapIntensity: 0.6,
+});
+const shoulderMat = new THREE.MeshStandardMaterial({ color: 0x1f1f24, roughness: 0.95 });
+
+function makeGrassTexture() {
+    const SIZE = 256;
+    const c = document.createElement("canvas");
+    c.width = c.height = SIZE;
+    const g = c.getContext("2d");
+    g.fillStyle = "#3d6b2f";
+    g.fillRect(0, 0, SIZE, SIZE);
+    for (let i = 0; i < 6000; i++) {
+        const r = 30 + Math.random() * 50;
+        const gr = 60 + Math.random() * 50;
+        const b = 20 + Math.random() * 30;
+        g.fillStyle = `rgb(${r},${gr},${b})`;
+        g.fillRect(Math.random() * SIZE, Math.random() * SIZE, 1.5, 1.5);
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(80, 80);
+    tex.anisotropy = MAX_ANISO;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+}
+const grassMat = new THREE.MeshStandardMaterial({ map: makeGrassTexture(), color: 0xffffff, roughness: 1 });
 
 function makeRoadSegment() {
     const g = new THREE.Group();
@@ -215,8 +409,6 @@ function buildMountains() {
     return group;
 }
 scene.add(buildMountains());
-
-scene.fog = new THREE.Fog(0x88c5ff, 120, 450);
 
 // ---------- Obstacles ----------
 const OBSTACLE_TYPES = ["cone", "barrel", "block", "car"];
@@ -394,16 +586,39 @@ function releaseObstacle(ob) {
 function buildCar() {
     const car = new THREE.Group();
 
-    const redMat    = new THREE.MeshStandardMaterial({ color: 0xc8161d, roughness: 0.25, metalness: 0.6 });
-    const carbonMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.45, metalness: 0.35 });
-    const blackMat  = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.7, metalness: 0.2 });
-    const glassMat  = new THREE.MeshStandardMaterial({ color: 0x0a0f15, roughness: 0.05, metalness: 0.9, transparent: true, opacity: 0.85 });
-    const stripeMat = new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.4, metalness: 0.2 });
-    const calipMat  = new THREE.MeshStandardMaterial({ color: 0xd42828, roughness: 0.5, metalness: 0.4 });
-    const ledMat    = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xbfe0ff, emissiveIntensity: 1.4 });
-    const tailMat   = new THREE.MeshStandardMaterial({ color: 0xff1010, emissive: 0xff0000, emissiveIntensity: 0.9 });
-    const rimMat    = new THREE.MeshStandardMaterial({ color: 0x161616, roughness: 0.35, metalness: 0.9 });
-    const tireMat   = new THREE.MeshStandardMaterial({ color: 0x0c0c0c, roughness: 0.95 });
+    // AAA-style PBR materials with clearcoat car paint
+    const redMat    = new THREE.MeshPhysicalMaterial({
+        color: 0xc8161d, roughness: 0.32, metalness: 0.85,
+        clearcoat: 1.0, clearcoatRoughness: 0.06,
+        envMapIntensity: 1.6,
+    });
+    const carbonMat = new THREE.MeshPhysicalMaterial({
+        color: 0x0c0c0c, roughness: 0.35, metalness: 0.6,
+        clearcoat: 0.8, clearcoatRoughness: 0.18,
+        envMapIntensity: 1.2,
+    });
+    const blackMat  = new THREE.MeshStandardMaterial({ color: 0x101013, roughness: 0.6, metalness: 0.3, envMapIntensity: 0.7 });
+    const glassMat  = new THREE.MeshPhysicalMaterial({
+        color: 0x05080c, roughness: 0.04, metalness: 0.0,
+        transmission: 0.15, ior: 1.45,
+        clearcoat: 1.0, clearcoatRoughness: 0.02,
+        transparent: true, opacity: 0.75,
+        envMapIntensity: 1.8,
+    });
+    const stripeMat = new THREE.MeshPhysicalMaterial({
+        color: 0xf2f2f2, roughness: 0.35, metalness: 0.1,
+        clearcoat: 1.0, clearcoatRoughness: 0.1,
+        envMapIntensity: 1.0,
+    });
+    const calipMat  = new THREE.MeshStandardMaterial({ color: 0xd02525, roughness: 0.45, metalness: 0.5, envMapIntensity: 1.0 });
+    const ledMat    = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xcce8ff, emissiveIntensity: 2.4 });
+    const tailMat   = new THREE.MeshStandardMaterial({ color: 0xff1010, emissive: 0xff0000, emissiveIntensity: 1.5 });
+    const rimMat    = new THREE.MeshPhysicalMaterial({
+        color: 0x111114, roughness: 0.28, metalness: 1.0,
+        clearcoat: 0.6, clearcoatRoughness: 0.15,
+        envMapIntensity: 1.4,
+    });
+    const tireMat   = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.92, envMapIntensity: 0.2 });
 
     // ---- Main monocoque (low + wide) ----
     // Use ExtrudeGeometry from a top-down silhouette to get a tapered shape.
@@ -996,6 +1211,12 @@ function updateCamera(dt) {
     camera.position.lerp(desired, Math.min(1, dt * lerpFactor));
     camTarget.lerp(lookAt, Math.min(1, dt * lerpFactor));
     camera.lookAt(camTarget);
+
+    // Sky + sun light follow the camera so they never run out of range
+    sky.position.copy(camera.position);
+    sun.position.set(camera.position.x + 90, 140, camera.position.z + 110);
+    sun.target.position.set(camera.position.x, 0, camera.position.z + 20);
+    sun.target.updateMatrixWorld();
 }
 
 // ---------- HUD ----------
