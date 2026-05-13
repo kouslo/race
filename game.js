@@ -35,13 +35,13 @@ function buildSky() {
     const skyGeo = new THREE.SphereGeometry(1500, 48, 32);
     const skyMat = new THREE.ShaderMaterial({
         uniforms: {
-            topColor:    { value: new THREE.Color(0x1a4a8a) },
-            midColor:    { value: new THREE.Color(0x6cb2f0) },
-            horizonCol:  { value: new THREE.Color(0xf2c98a) },
-            sunDir:      { value: new THREE.Vector3(0.45, 0.55, 0.7).normalize() },
-            sunColor:    { value: new THREE.Color(0xffe8b0) },
-            sunSize:     { value: 0.998 },
-            sunHaloSize: { value: 0.92 },
+            topColor:    { value: new THREE.Color(0x153560) },
+            midColor:    { value: new THREE.Color(0x6ea8d8) },
+            horizonCol:  { value: new THREE.Color(0xffb478) },
+            sunDir:      { value: new THREE.Vector3(0.45, 0.35, 0.78).normalize() },
+            sunColor:    { value: new THREE.Color(0xffe2a8) },
+            sunSize:     { value: 0.9985 },
+            sunHaloSize: { value: 0.86 },
         },
         vertexShader: `
             varying vec3 vWorldPos;
@@ -80,33 +80,39 @@ function buildSky() {
 const sky = buildSky();
 scene.add(sky);
 
-scene.fog = new THREE.FogExp2(0xaccfee, 0.0035);
-scene.background = new THREE.Color(0x6cb2f0);
+scene.fog = new THREE.FogExp2(0xd5a878, 0.0045);
+scene.background = new THREE.Color(0x6ea8d8);
 
 // ---------- Lighting ----------
 const hemi = new THREE.HemisphereLight(0xbcd6ff, 0x3a5a2a, 0.45);
 scene.add(hemi);
 
-const sun = new THREE.DirectionalLight(0xfff2d5, 1.4);
-sun.position.set(90, 140, 110);
+// Golden-hour key light — low angle, warm
+const sun = new THREE.DirectionalLight(0xffd9a0, 1.7);
+sun.position.set(70, 70, 110);
 sun.castShadow = true;
 sun.shadow.mapSize.set(4096, 4096);
-sun.shadow.camera.left = -120;
-sun.shadow.camera.right = 120;
-sun.shadow.camera.top = 120;
-sun.shadow.camera.bottom = -120;
+sun.shadow.camera.left = -100;
+sun.shadow.camera.right = 100;
+sun.shadow.camera.top = 100;
+sun.shadow.camera.bottom = -100;
 sun.shadow.camera.near = 1;
 sun.shadow.camera.far = 500;
-sun.shadow.bias = -0.0002;
-sun.shadow.normalBias = 0.05;
-sun.shadow.radius = 3;
+sun.shadow.bias = -0.00015;
+sun.shadow.normalBias = 0.04;
+sun.shadow.radius = 6;
 scene.add(sun);
 scene.add(sun.target);
 
-// Cool rim/fill light from opposite side
-const fill = new THREE.DirectionalLight(0x88aacc, 0.35);
-fill.position.set(-100, 60, -80);
-scene.add(fill);
+// Cool rim/back light for atmospheric depth
+const rim = new THREE.DirectionalLight(0x7fa3d8, 0.55);
+rim.position.set(-80, 50, -90);
+scene.add(rim);
+
+// Bounce light — warm light from below to fake ground bounce
+const bounce = new THREE.DirectionalLight(0xffcc88, 0.18);
+bounce.position.set(0, -20, 30);
+scene.add(bounce);
 
 // ---------- Environment map (for PBR reflections) ----------
 function buildEnvMap() {
@@ -116,11 +122,12 @@ function buildEnvMap() {
     c.width = size * 2; c.height = size;
     const g = c.getContext("2d");
     const grad = g.createLinearGradient(0, 0, 0, size);
-    grad.addColorStop(0.0, "#1a4a8a");
-    grad.addColorStop(0.45, "#6cb2f0");
-    grad.addColorStop(0.55, "#f2c98a");
-    grad.addColorStop(0.65, "#5a8a4a");
-    grad.addColorStop(1.0, "#1a2a1a");
+    grad.addColorStop(0.0, "#153560");
+    grad.addColorStop(0.4, "#6ea8d8");
+    grad.addColorStop(0.55, "#ffb478");
+    grad.addColorStop(0.62, "#7a6040");
+    grad.addColorStop(0.7, "#3a4a30");
+    grad.addColorStop(1.0, "#0e1a10");
     g.fillStyle = grad;
     g.fillRect(0, 0, size * 2, size);
     // Sun spot
@@ -363,52 +370,172 @@ for (let i = 0; i < NUM_SEGS; i++) {
 }
 
 // ---------- Side scenery ----------
+// Multi-layer foliage trees — bark with normal variation, layered cones
+const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a2f18, roughness: 0.95, metalness: 0 });
+const leafMats = [
+    new THREE.MeshStandardMaterial({ color: 0x2d6a2d, roughness: 0.85, flatShading: true }),
+    new THREE.MeshStandardMaterial({ color: 0x35783a, roughness: 0.85, flatShading: true }),
+    new THREE.MeshStandardMaterial({ color: 0x1f5a25, roughness: 0.85, flatShading: true }),
+    new THREE.MeshStandardMaterial({ color: 0x4a7f3a, roughness: 0.85, flatShading: true }),
+];
+
 function makeTree() {
     const g = new THREE.Group();
-    const trunkH = 4 + Math.random() * 2;
+    const variant = Math.floor(Math.random() * 3); // 0: conifer, 1: oak, 2: small
+
+    const trunkH = (variant === 2 ? 2.5 : 4.5) + Math.random() * 2.2;
     const trunk = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.4, 0.6, trunkH, 8),
-        new THREE.MeshStandardMaterial({ color: 0x5a3a20, roughness: 1 })
+        new THREE.CylinderGeometry(0.25, 0.55, trunkH, 8),
+        trunkMat
     );
     trunk.position.y = trunkH / 2;
     trunk.castShadow = true;
+    trunk.receiveShadow = true;
     g.add(trunk);
 
-    const leaves = new THREE.Mesh(
-        new THREE.ConeGeometry(2.5 + Math.random(), 6 + Math.random() * 2, 8),
-        new THREE.MeshStandardMaterial({ color: 0x2d6a2d, roughness: 1 })
-    );
-    leaves.position.y = trunkH + 2.5;
-    leaves.castShadow = true;
-    g.add(leaves);
+    if (variant === 0) {
+        // Conifer — 3 stacked cones
+        const baseR = 2.2 + Math.random() * 0.8;
+        for (let i = 0; i < 3; i++) {
+            const r = baseR * (1 - i * 0.25);
+            const h = 3.5 - i * 0.6;
+            const c = new THREE.Mesh(
+                new THREE.ConeGeometry(r, h, 8),
+                leafMats[Math.floor(Math.random() * leafMats.length)]
+            );
+            c.position.y = trunkH + 1.5 + i * 1.6;
+            c.rotation.y = Math.random() * Math.PI;
+            c.castShadow = true;
+            g.add(c);
+        }
+    } else if (variant === 1) {
+        // Oak — overlapping spheres
+        const baseR = 2.0 + Math.random() * 0.8;
+        const cluster = 4 + Math.floor(Math.random() * 3);
+        for (let i = 0; i < cluster; i++) {
+            const r = baseR * (0.7 + Math.random() * 0.5);
+            const s = new THREE.Mesh(
+                new THREE.IcosahedronGeometry(r, 0),
+                leafMats[Math.floor(Math.random() * leafMats.length)]
+            );
+            s.position.set(
+                (Math.random() - 0.5) * baseR * 1.4,
+                trunkH + 1.0 + (Math.random() - 0.3) * baseR * 0.8,
+                (Math.random() - 0.5) * baseR * 1.4
+            );
+            s.castShadow = true;
+            g.add(s);
+        }
+    } else {
+        // Small bush/shrub
+        const r = 1.0 + Math.random() * 0.6;
+        const s = new THREE.Mesh(
+            new THREE.IcosahedronGeometry(r, 0),
+            leafMats[Math.floor(Math.random() * leafMats.length)]
+        );
+        s.position.y = trunkH + 0.3;
+        s.castShadow = true;
+        g.add(s);
+    }
+
+    g.rotation.y = Math.random() * Math.PI * 2;
     return g;
 }
 
 const trees = [];
-for (let i = 0; i < 80; i++) {
+for (let i = 0; i < 160; i++) {
     const t = makeTree();
     const side = i % 2 === 0 ? -1 : 1;
-    t.position.x = side * (ROAD_TOTAL_HALF + 5 + Math.random() * 25);
+    t.position.x = side * (ROAD_TOTAL_HALF + 3 + Math.random() * 50);
     t.position.z = Math.random() * ROAD_REPEAT;
     scene.add(t);
     trees.push(t);
 }
 
+// Multi-peak detailed mountains with snow caps + atmospheric tint
 function buildMountains() {
     const group = new THREE.Group();
-    const mat = new THREE.MeshStandardMaterial({ color: 0x6a7a85, roughness: 1, flatShading: true });
+    const rockMat = new THREE.MeshStandardMaterial({ color: 0x5e6f7e, roughness: 1, flatShading: true });
+    const distantMat = new THREE.MeshStandardMaterial({ color: 0x7d96b0, roughness: 1, flatShading: true });
+    const snowMat = new THREE.MeshStandardMaterial({ color: 0xf4f4f8, roughness: 0.6, flatShading: true });
+
+    // Near mountains (more saturated)
+    for (let i = 0; i < 40; i++) {
+        const side = i % 2 === 0 ? -1 : 1;
+        const x = side * (260 + Math.random() * 90);
+        const z = i * 50 - 300;
+        const h = 70 + Math.random() * 100;
+        const r = 50 + Math.random() * 35;
+        const seg = 5 + Math.floor(Math.random() * 3);
+        const m = new THREE.Mesh(new THREE.ConeGeometry(r, h, seg), rockMat);
+        m.position.set(x, h / 2 - 2, z);
+        m.rotation.y = Math.random() * Math.PI;
+        m.castShadow = true;
+        group.add(m);
+
+        // Snow cap on top third
+        if (h > 100) {
+            const snowH = h * 0.35;
+            const snowR = r * (snowH / h);
+            const snow = new THREE.Mesh(new THREE.ConeGeometry(snowR, snowH, seg), snowMat);
+            snow.position.set(x, h - snowH / 2 - 2, z);
+            snow.rotation.y = m.rotation.y;
+            group.add(snow);
+        }
+    }
+
+    // Far mountains (lighter, hazier — atmospheric perspective)
     for (let i = 0; i < 30; i++) {
         const side = i % 2 === 0 ? -1 : 1;
-        const x = side * (300 + Math.random() * 100);
-        const z = i * 60 - 200;
-        const h = 60 + Math.random() * 80;
-        const m = new THREE.Mesh(new THREE.ConeGeometry(50 + Math.random() * 30, h, 5), mat);
-        m.position.set(x, h / 2 - 2, z);
+        const x = side * (520 + Math.random() * 200);
+        const z = i * 80 - 400;
+        const h = 120 + Math.random() * 140;
+        const r = 80 + Math.random() * 50;
+        const m = new THREE.Mesh(new THREE.ConeGeometry(r, h, 5), distantMat);
+        m.position.set(x, h / 2 - 4, z);
         group.add(m);
     }
+
     return group;
 }
 scene.add(buildMountains());
+
+// ---------- Volumetric ground fog ----------
+function makeFogLayer() {
+    const c = document.createElement("canvas");
+    c.width = c.height = 256;
+    const g = c.getContext("2d");
+    const grd = g.createRadialGradient(128, 128, 0, 128, 128, 128);
+    grd.addColorStop(0, "rgba(255,200,160,0.55)");
+    grd.addColorStop(0.5, "rgba(220,180,150,0.25)");
+    grd.addColorStop(1, "rgba(200,160,130,0)");
+    g.fillStyle = grd;
+    g.fillRect(0, 0, 256, 256);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+}
+const fogLayerTex = makeFogLayer();
+
+const fogLayers = [];
+const FOG_LAYER_COUNT = 18;
+for (let i = 0; i < FOG_LAYER_COUNT; i++) {
+    const mat = new THREE.MeshBasicMaterial({
+        map: fogLayerTex,
+        transparent: true,
+        opacity: 0.35,
+        depthWrite: false,
+        blending: THREE.NormalBlending,
+        fog: false,
+    });
+    const layer = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), mat);
+    layer.rotation.x = -Math.PI / 2;
+    layer.position.y = 0.4 + Math.random() * 0.8;
+    layer.position.x = (Math.random() - 0.5) * 80;
+    layer.position.z = i * 30 - 50;
+    scene.add(layer);
+    fogLayers.push(layer);
+}
 
 // ---------- Obstacles ----------
 const OBSTACLE_TYPES = ["cone", "barrel", "block", "car"];
@@ -1115,7 +1242,15 @@ function update(dt) {
     for (const t of trees) {
         if (t.position.z < car.position.z - 50) {
             t.position.z += ROAD_REPEAT;
-            t.position.x = (Math.random() < 0.5 ? -1 : 1) * (ROAD_TOTAL_HALF + 5 + Math.random() * 25);
+            t.position.x = (Math.random() < 0.5 ? -1 : 1) * (ROAD_TOTAL_HALF + 3 + Math.random() * 50);
+        }
+    }
+
+    // Recycle volumetric fog layers
+    for (const layer of fogLayers) {
+        if (layer.position.z < car.position.z - 30) {
+            layer.position.z += FOG_LAYER_COUNT * 30;
+            layer.position.x = (Math.random() - 0.5) * 80;
         }
     }
 
@@ -1212,13 +1347,28 @@ function updateCamera(dt) {
 
     camera.position.lerp(desired, Math.min(1, dt * lerpFactor));
     camTarget.lerp(lookAt, Math.min(1, dt * lerpFactor));
+
+    // Speed-based camera shake (subtle, builds up at high speed)
+    const speedRatio = Math.max(0, (state.speed - 30) / 40);
+    if (speedRatio > 0) {
+        const shake = speedRatio * 0.06;
+        camera.position.x += (Math.random() - 0.5) * shake;
+        camera.position.y += (Math.random() - 0.5) * shake * 0.5;
+    }
+
     camera.lookAt(camTarget);
 
     // Sky + sun light follow the camera so they never run out of range
     sky.position.copy(camera.position);
-    sun.position.set(camera.position.x + 90, 140, camera.position.z + 110);
+    sun.position.set(camera.position.x + 70, 70, camera.position.z + 110);
     sun.target.position.set(camera.position.x, 0, camera.position.z + 20);
     sun.target.updateMatrixWorld();
+
+    // ---- CSS post-fx driven by speed ----
+    const blur = Math.max(0, (state.speed - 35) / 8); // px
+    document.documentElement.style.setProperty("--motion-blur", `${Math.min(blur, 3.5).toFixed(2)}px`);
+    const speedlinesEl = document.getElementById("speedlines");
+    if (speedlinesEl) speedlinesEl.classList.toggle("active", state.speed > 55);
 }
 
 // ---------- HUD ----------
