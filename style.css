@@ -71,6 +71,28 @@ body {
 
 #hp-fill.low { animation: pulse 0.6s infinite; }
 
+#boost-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #1ec8ff, #46e0ff 50%, #ffffff);
+    transition: width 0.15s linear;
+    box-shadow: 0 0 8px rgba(70, 224, 255, 0.6);
+}
+
+#boost-fill.ready {
+    animation: boostReady 0.7s ease-in-out infinite;
+}
+
+@keyframes boostReady {
+    0%, 100% { filter: brightness(1); }
+    50%      { filter: brightness(1.7); }
+}
+
+#boost-wrap.active #boost-fill {
+    background: linear-gradient(90deg, #ff6b00, #ffd700 50%, #fff);
+    box-shadow: 0 0 18px rgba(255, 170, 30, 0.95);
+}
+
 @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
@@ -151,6 +173,44 @@ body {
 @keyframes rage {
     0%, 100% { filter: brightness(1); }
     50%      { filter: brightness(1.15); }
+}
+
+/* ---- Nitro boost overlay ---- */
+#postfx.boost #vignette {
+    background:
+        radial-gradient(ellipse at center, transparent 25%, rgba(0,80,180,0.55) 75%, rgba(0,0,40,0.85) 100%),
+        radial-gradient(ellipse at center, transparent 20%, rgba(255,140,0,0.18) 50%, transparent 70%);
+}
+#postfx.boost #chroma {
+    background:
+        radial-gradient(ellipse at 20% 50%, transparent 50%, rgba(0,200,255,0.25) 100%),
+        radial-gradient(ellipse at 80% 50%, transparent 50%, rgba(255,60,180,0.25) 100%);
+    animation: chromaShake 0.05s steps(2) infinite;
+}
+#postfx.boost::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        repeating-radial-gradient(circle at center,
+            transparent 0px,
+            transparent 6px,
+            rgba(255,255,255,0.04) 7px,
+            transparent 9px);
+    animation: warp 0.6s linear infinite;
+    pointer-events: none;
+    mix-blend-mode: screen;
+}
+
+@keyframes chromaShake {
+    0%   { transform: translate(0,0); }
+    50%  { transform: translate(2px, -1px); }
+    100% { transform: translate(-1px, 1px); }
+}
+
+@keyframes warp {
+    from { transform: scale(1.0); opacity: 0.6; }
+    to   { transform: scale(1.25); opacity: 0; }
 }
 
 #postfx {

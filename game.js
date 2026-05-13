@@ -1320,6 +1320,17 @@ const state = {
     currentLane: 2,
     nextSpawnZ: 80,
     stageIdx: 0,
+
+    // Boost / nitro
+    boost: 0,           // 0..100
+    boostMax: 100,
+    boostActive: false,
+    boostFillRate: 7,   // points/sec while driving cleanly
+    boostHitFill: -15,  // points lost on collision (no fill from damage)
+    boostDrainRate: 38, // points/sec while active
+    boostMinToActivate: 25,
+    boostMult: 1.85,    // speed multiplier while active
+    fov: 65,
 };
 
 function resetCar() {
@@ -1340,8 +1351,76 @@ function resetCar() {
         roadSegments[i].position.z = i * SEG_LENGTH - SEG_LENGTH;
     }
 
+    state.boost = 0;
+    state.boostActive = false;
+    state.fov = 65;
+    camera.fov = 65;
+    camera.updateProjectionMatrix();
+    document.getElementById("boost-wrap").classList.remove("active");
+    document.getElementById("postfx").classList.remove("boost");
+
     applyStageVisuals(0, true);
     updateHUD();
+}
+
+// ---------- Nitro SFX + transition effects ----------
+function triggerBoostStart() {
+    document.getElementById("postfx").classList.add("boost");
+    if (!bgm.ctx) return;
+    const t = bgm.ctx.currentTime;
+    // Whoosh / engine roar — descending square sweep + noise burst
+    const o = bgm.ctx.createOscillator();
+    o.type = "sawtooth";
+    o.frequency.setValueAtTime(80, t);
+    o.frequency.exponentialRampToValueAtTime(720, t + 0.35);
+    const filt = bgm.ctx.createBiquadFilter();
+    filt.type = "lowpass";
+    filt.frequency.setValueAtTime(400, t);
+    filt.frequency.exponentialRampToValueAtTime(6000, t + 0.4);
+    filt.Q.value = 8;
+    const g = bgm.ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.45, t + 0.04);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+    o.connect(filt).connect(g).connect(bgm.ctx.destination);
+    o.start(t); o.stop(t + 0.6);
+
+    // Air rush noise
+    const bufSize = bgm.ctx.sampleRate * 0.6;
+    const buf = bgm.ctx.createBuffer(1, bufSize, bgm.ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufSize);
+    const n = bgm.ctx.createBufferSource();
+    n.buffer = buf;
+    const hp = bgm.ctx.createBiquadFilter();
+    hp.type = "bandpass";
+    hp.frequency.value = 2500;
+    const ng = bgm.ctx.createGain();
+    ng.gain.value = 0.25;
+    n.connect(hp).connect(ng).connect(bgm.ctx.destination);
+    n.start(t); n.stop(t + 0.6);
+}
+
+function triggerBoostEnd() {
+    document.getElementById("postfx").classList.remove("boost");
+}
+
+function playSmash() {
+    if (!bgm.ctx) return;
+    const t = bgm.ctx.currentTime;
+    const bufSize = bgm.ctx.sampleRate * 0.25;
+    const buf = bgm.ctx.createBuffer(1, bufSize, bgm.ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufSize);
+    const n = bgm.ctx.createBufferSource();
+    n.buffer = buf;
+    const filt = bgm.ctx.createBiquadFilter();
+    filt.type = "lowpass";
+    filt.frequency.value = 1800;
+    const g = bgm.ctx.createGain();
+    g.gain.value = 0.35;
+    n.connect(filt).connect(g).connect(bgm.ctx.destination);
+    n.start(t); n.stop(t + 0.27);
 }
 
 // Stage visual feedback (banner + HUD chip + post-fx tint + BGM tempo)
@@ -1448,6 +1527,29 @@ function update(dt) {
 
     const accelerating = keys["arrowup"] || keys["w"];
     const reversing = keys["arrowdown"] || keys["s"];
+    const boostHeld = keys["shift"];
+
+    // ---- Nitro boost handling ----
+    const boostWrap = document.getElementById("boost-wrap");
+    const boostFillEl = document.getElementById("boost-fill");
+    if (boostHeld && !state.boostActive && state.boost >= state.boostMinToActivate) {
+        state.boostActive = true;
+        boostWrap.classList.add("active");
+        triggerBoostStart();
+    }
+    if (state.boostActive) {
+        state.boost -= state.boostDrainRate * dt;
+        if (state.boost <= 0 || !boostHeld) {
+            state.boost = Math.max(0, state.boost);
+            state.boostActive = false;
+            boostWrap.classList.remove("active");
+            triggerBoostEnd();
+        }
+    } else {
+        state.boost = Math.min(state.boostMax, state.boost + state.boostFillRate * dt);
+    }
+    boostFillEl.style.width = (state.boost / state.boostMax * 100) + "%";
+    boostFillEl.classList.toggle("ready", state.boost >= state.boostMinToActivate && !state.boostActive);
 
     // Lane change (edge triggered — one press = one lane).
     // Camera looks down +Z so world +X projects to screen LEFT; we flip so
@@ -1480,7 +1582,12 @@ function update(dt) {
         if (state.speed > stage.base) state.speed -= 6 * dt;
         else if (state.speed < stage.base) state.speed += 6 * dt;
     }
-    state.speed = Math.max(state.minSpeed, Math.min(stage.max, state.speed));
+    const effectiveMax = state.boostActive ? stage.max * state.boostMult : stage.max;
+    if (state.boostActive) {
+        // Snap toward the boosted top speed
+        state.speed += 80 * dt;
+    }
+    state.speed = Math.max(state.minSpeed, Math.min(effectiveMax, state.speed));
 
     // Forward motion (car heads down +Z)
     car.position.z += state.speed * dt;
@@ -1562,19 +1669,29 @@ function update(dt) {
         const dz = Math.abs(ob.position.z - car.position.z) - (carHalfZ + sz.z / 2);
         if (dx < 0 && dz < 0) {
             ob.userData.hit = true;
-            state.hp = Math.max(0, state.hp - 10);
-            // slow down briefly on hit
-            state.speed = Math.max(state.minSpeed, state.speed - 12);
-            flashDamage();
-            damageBeep();
-            // visually knock the obstacle to the side
-            ob.userData.fly = {
-                vx: (ob.position.x - car.position.x) * 0.5 + (Math.random() - 0.5) * 4,
-                vy: 6 + Math.random() * 3,
-                vz: -8,
-                vr: (Math.random() - 0.5) * 10,
-            };
-            if (state.hp <= 0) endRun();
+            if (state.boostActive) {
+                // Invincible — plow through, obstacle launches violently
+                ob.userData.fly = {
+                    vx: (ob.position.x - car.position.x) * 0.4 + (Math.random() - 0.5) * 6,
+                    vy: 14 + Math.random() * 6,
+                    vz: 18 + state.speed * 0.3, // forward (away from car)
+                    vr: (Math.random() - 0.5) * 18,
+                };
+                flashDamage();
+                playSmash();
+            } else {
+                state.hp = Math.max(0, state.hp - 10);
+                state.speed = Math.max(state.minSpeed, state.speed - 12);
+                flashDamage();
+                damageBeep();
+                ob.userData.fly = {
+                    vx: (ob.position.x - car.position.x) * 0.5 + (Math.random() - 0.5) * 4,
+                    vy: 6 + Math.random() * 3,
+                    vz: -8,
+                    vr: (Math.random() - 0.5) * 10,
+                };
+                if (state.hp <= 0) endRun();
+            }
         }
     }
 
@@ -1633,12 +1750,22 @@ function updateCamera(dt) {
     camera.position.lerp(desired, Math.min(1, dt * lerpFactor));
     camTarget.lerp(lookAt, Math.min(1, dt * lerpFactor));
 
-    // Speed-based camera shake (subtle, builds up at high speed)
+    // Speed-based + boost camera shake
     const speedRatio = Math.max(0, (state.speed - 30) / 40);
-    if (speedRatio > 0) {
-        const shake = speedRatio * 0.06;
+    let shake = speedRatio * 0.06;
+    if (state.boostActive) shake += 0.18; // strong boost shudder
+    if (shake > 0) {
         camera.position.x += (Math.random() - 0.5) * shake;
-        camera.position.y += (Math.random() - 0.5) * shake * 0.5;
+        camera.position.y += (Math.random() - 0.5) * shake * 0.6;
+        camera.position.z += (Math.random() - 0.5) * shake * 0.4;
+    }
+
+    // FOV punch — wider FOV during boost
+    const targetFov = state.boostActive ? 92 : 65;
+    state.fov += (targetFov - state.fov) * Math.min(1, dt * (state.boostActive ? 12 : 6));
+    if (Math.abs(camera.fov - state.fov) > 0.05) {
+        camera.fov = state.fov;
+        camera.updateProjectionMatrix();
     }
 
     camera.lookAt(camTarget);
