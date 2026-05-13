@@ -47,6 +47,47 @@ body {
     font-family: "Courier New", monospace;
 }
 
+.hp-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 180px;
+}
+
+.hp-bar {
+    width: 100%;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+#hp-fill {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, #06d6a0, #ffd166 60%, #ef476f);
+    transition: width 0.25s ease;
+}
+
+#hp-fill.low { animation: pulse 0.6s infinite; }
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+#damage-flash {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 40%, rgba(239,71,111,0.5) 100%);
+    opacity: 0;
+    z-index: 5;
+    transition: opacity 0.4s ease-out;
+}
+
+#damage-flash.active { opacity: 1; transition: opacity 0.05s; }
+
 #speedometer {
     position: absolute;
     bottom: 24px;

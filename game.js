@@ -474,21 +474,14 @@ const state = {
     maxSteer: 0.55,
     angle: 0,         // heading on XZ plane
     cameraMode: 0,    // 0 chase, 1 hood, 2 cockpit
-    totalLaps: 3,
-    lap: 1,
     elapsed: 0,
-    lapStart: 0,
-    bestLap: null,
-    checkpointsHit: [],
-    checkpoints: [],
+    hp: 100,
+    maxHp: 100,
+    distance: 0,      // meters traveled (forward only)
+    topSpeed: 0,
+    wasOffTrack: false,
+    bestDistance: null,
 };
-
-// Place checkpoints along the track
-const NUM_CP = 12;
-for (let i = 0; i < NUM_CP; i++) {
-    const p = curve.getPointAt(i / NUM_CP);
-    state.checkpoints.push({ x: p.x, z: p.z, idx: i });
-}
 
 function resetCar() {
     const start = curve.getPointAt(0);
@@ -497,11 +490,43 @@ function resetCar() {
     state.angle = Math.atan2(tan.x, tan.z);
     car.rotation.y = state.angle;
     state.speed = 0;
-    state.lap = 1;
     state.elapsed = 0;
-    state.lapStart = 0;
-    state.checkpointsHit = [];
+    state.hp = state.maxHp;
+    state.distance = 0;
+    state.topSpeed = 0;
+    state.wasOffTrack = false;
     updateHUD();
+}
+
+function flashDamage() {
+    const el = document.getElementById("damage-flash");
+    el.classList.add("active");
+    setTimeout(() => el.classList.remove("active"), 80);
+}
+
+function endRun() {
+    state.mode = "finished";
+    if (state.bestDistance === null || state.distance > state.bestDistance) {
+        state.bestDistance = state.distance;
+    }
+    document.getElementById("final-distance").textContent = Math.round(state.distance);
+    document.getElementById("final-time").textContent = state.elapsed.toFixed(2);
+    document.getElementById("final-top").textContent = Math.round(state.topSpeed * 3.6 * 1.6);
+    document.getElementById("finish-overlay").classList.remove("hidden");
+}
+
+function damageBeep() {
+    if (!bgm.ctx) return;
+    const t = bgm.ctx.currentTime;
+    const o = bgm.ctx.createOscillator();
+    o.type = "square";
+    o.frequency.setValueAtTime(280, t);
+    o.frequency.exponentialRampToValueAtTime(80, t + 0.18);
+    const g = bgm.ctx.createGain();
+    g.gain.setValueAtTime(0.25, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+    o.connect(g).connect(bgm.ctx.destination);
+    o.start(t); o.stop(t + 0.22);
 }
 
 // ---------- Input ----------
@@ -562,9 +587,10 @@ function update(dt) {
 
     state.speed = Math.max(state.maxReverse, Math.min(state.maxSpeed, state.speed));
 
-    // Off-track penalty
+    // Off-track penalty + HP damage
     const trackDist = distanceToTrack(car.position.x, car.position.z);
-    if (trackDist > TRACK_WIDTH / 2) {
+    const offTrack = trackDist > TRACK_WIDTH / 2;
+    if (offTrack) {
         const over = trackDist - TRACK_WIDTH / 2;
         const slow = Math.min(50, 10 + over) * dt;
         if (state.speed > 0) state.speed = Math.max(0, state.speed - slow);
@@ -572,7 +598,16 @@ function update(dt) {
         const offMax = 28;
         if (state.speed > offMax) state.speed = offMax;
         if (state.speed < -offMax) state.speed = -offMax;
+
+        if (!state.wasOffTrack) {
+            // crossed line — take 10 damage
+            state.hp = Math.max(0, state.hp - 10);
+            flashDamage();
+            damageBeep();
+            if (state.hp <= 0) endRun();
+        }
     }
+    state.wasOffTrack = offTrack;
 
     // Steering
     let targetSteer = 0;
@@ -585,9 +620,17 @@ function update(dt) {
     state.angle += turnAmount;
 
     // Movement
-    car.position.x += Math.sin(state.angle) * state.speed * dt;
-    car.position.z += Math.cos(state.angle) * state.speed * dt;
+    const dx = Math.sin(state.angle) * state.speed * dt;
+    const dz = Math.cos(state.angle) * state.speed * dt;
+    car.position.x += dx;
+    car.position.z += dz;
     car.rotation.y = state.angle;
+
+    // Distance traveled (forward motion only counts)
+    if (state.speed > 0) {
+        state.distance += state.speed * dt;
+    }
+    if (Math.abs(state.speed) > state.topSpeed) state.topSpeed = Math.abs(state.speed);
 
     // Spin wheels & steer front wheels
     const wheelRotSpeed = state.speed / 0.45;
@@ -601,32 +644,6 @@ function update(dt) {
     const pitch = (accelerating ? -0.03 : reversing ? 0.04 : 0) * speedRatio;
     car.rotation.z = roll;
     car.rotation.x = pitch;
-
-    // Checkpoint logic
-    for (let i = 0; i < state.checkpoints.length; i++) {
-        const cp = state.checkpoints[i];
-        const d = Math.hypot(car.position.x - cp.x, car.position.z - cp.z);
-        if (d < 10 && !state.checkpointsHit.includes(i)) {
-            const expected = state.checkpointsHit.length === 0
-                ? 0
-                : (state.checkpointsHit[state.checkpointsHit.length - 1] + 1) % state.checkpoints.length;
-            if (i === expected) state.checkpointsHit.push(i);
-        }
-    }
-
-    if (state.checkpointsHit.length === state.checkpoints.length) {
-        const lapTime = state.elapsed - state.lapStart;
-        if (state.bestLap === null || lapTime < state.bestLap) state.bestLap = lapTime;
-        state.lapStart = state.elapsed;
-        state.checkpointsHit = [];
-        state.lap++;
-        if (state.lap > state.totalLaps) {
-            state.mode = "finished";
-            document.getElementById("final-time").textContent = state.elapsed.toFixed(2);
-            document.getElementById("final-best").textContent = (state.bestLap || 0).toFixed(2);
-            document.getElementById("finish-overlay").classList.remove("hidden");
-        }
-    }
 
     state.elapsed += dt;
 
@@ -691,10 +708,11 @@ function updateCamera(dt) {
 // ---------- HUD ----------
 const speedEl = document.getElementById("speed");
 const gearEl = document.getElementById("gear");
-const lapEl = document.getElementById("lap");
-const totalLapsEl = document.getElementById("total-laps");
+const distanceEl = document.getElementById("distance");
 const timeEl = document.getElementById("time");
 const bestEl = document.getElementById("best");
+const hpTextEl = document.getElementById("hp-text");
+const hpFillEl = document.getElementById("hp-fill");
 const needle = document.getElementById("needle");
 
 // Speedometer ticks
@@ -724,10 +742,13 @@ function updateHUD() {
     if (state.speed > 1) gearEl.textContent = Math.min(6, Math.ceil(state.speed / 14));
     else if (state.speed < -1) gearEl.textContent = "R";
     else gearEl.textContent = "N";
-    lapEl.textContent = state.lap;
-    totalLapsEl.textContent = state.totalLaps;
+    distanceEl.textContent = Math.round(state.distance);
     timeEl.textContent = state.elapsed.toFixed(2);
-    bestEl.textContent = state.bestLap === null ? "--" : state.bestLap.toFixed(2) + "s";
+    bestEl.textContent = state.bestDistance === null ? "--" : Math.round(state.bestDistance) + " m";
+
+    hpTextEl.textContent = Math.round(state.hp);
+    hpFillEl.style.width = (state.hp / state.maxHp * 100) + "%";
+    hpFillEl.classList.toggle("low", state.hp <= 30);
 
     // needle: -120deg at 0, +120deg at max
     const ratio = Math.min(1, k / 320);

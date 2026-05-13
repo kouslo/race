@@ -11,9 +11,13 @@
     <div id="hud">
         <div class="hud-item">속도: <span id="speed">0</span> km/h</div>
         <div class="hud-item">기어: <span id="gear">N</span></div>
-        <div class="hud-item">랩: <span id="lap">1</span> / <span id="total-laps">3</span></div>
+        <div class="hud-item">거리: <span id="distance">0</span> m</div>
         <div class="hud-item">시간: <span id="time">0.00</span>s</div>
         <div class="hud-item">베스트: <span id="best">--</span></div>
+        <div class="hud-item hp-wrap">
+            HP <span id="hp-text">100</span>
+            <div class="hp-bar"><div id="hp-fill"></div></div>
+        </div>
     </div>
 
     <div id="speedometer">
@@ -29,11 +33,14 @@
     <button id="mute-btn" title="BGM 토글">♪ ON</button>
 
     <canvas id="game"></canvas>
+    <div id="damage-flash"></div>
 
     <div id="overlay" class="overlay">
         <div class="panel">
             <h1>3D 레이싱</h1>
             <p>방향키 또는 WASD로 차량을 조종하세요</p>
+            <p style="color:#ffd166;font-weight:600;">생존 모드: HP 100, 트랙을 벗어날 때마다 -10</p>
+            <p>HP가 0이 되기 전에 최대한 멀리 달리세요!</p>
             <ul class="controls">
                 <li><b>↑ / W</b> : 가속</li>
                 <li><b>↓ / S</b> : 후진 / 브레이크</li>
@@ -48,9 +55,10 @@
 
     <div id="finish-overlay" class="overlay hidden">
         <div class="panel">
-            <h1>완주!</h1>
-            <p>총 시간: <span id="final-time">0.00</span>초</p>
-            <p>베스트 랩: <span id="final-best">0.00</span>초</p>
+            <h1 id="finish-title">게임 오버</h1>
+            <p>주행 거리: <b style="color:#ffd166;font-size:24px;"><span id="final-distance">0</span> m</b></p>
+            <p>생존 시간: <span id="final-time">0.00</span>초</p>
+            <p>최고 속도: <span id="final-top">0</span> km/h</p>
             <button id="restart-btn">다시 시작</button>
         </div>
     </div>
