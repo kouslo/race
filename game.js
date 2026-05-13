@@ -29,19 +29,20 @@ window.addEventListener("resize", () => {
     camera.updateProjectionMatrix();
 });
 
-// ---------- Sky ----------
-// Custom gradient sky dome with sun disc + atmospheric haze
+// ---------- HDRI-style atmospheric scattering sky ----------
+const SUN_DIR = new THREE.Vector3(0.42, 0.30, 0.86).normalize();
+
 function buildSky() {
-    const skyGeo = new THREE.SphereGeometry(1500, 48, 32);
+    const skyGeo = new THREE.SphereGeometry(1800, 64, 40);
     const skyMat = new THREE.ShaderMaterial({
         uniforms: {
-            topColor:    { value: new THREE.Color(0x153560) },
-            midColor:    { value: new THREE.Color(0x6ea8d8) },
-            horizonCol:  { value: new THREE.Color(0xffb478) },
-            sunDir:      { value: new THREE.Vector3(0.45, 0.35, 0.78).normalize() },
-            sunColor:    { value: new THREE.Color(0xffe2a8) },
-            sunSize:     { value: 0.9985 },
-            sunHaloSize: { value: 0.86 },
+            sunDir:      { value: SUN_DIR.clone() },
+            rayleighCol: { value: new THREE.Color(0.20, 0.45, 0.95) },
+            mieCol:      { value: new THREE.Color(1.00, 0.78, 0.55) },
+            groundCol:   { value: new THREE.Color(0.18, 0.16, 0.14) },
+            sunIntensity:{ value: 22.0 },
+            sunDiscSize: { value: 0.9986 },
+            exposure:    { value: 0.42 },
         },
         vertexShader: `
             varying vec3 vWorldPos;
@@ -51,24 +52,68 @@ function buildSky() {
             }
         `,
         fragmentShader: `
-            uniform vec3 topColor;
-            uniform vec3 midColor;
-            uniform vec3 horizonCol;
             uniform vec3 sunDir;
-            uniform vec3 sunColor;
-            uniform float sunSize;
-            uniform float sunHaloSize;
+            uniform vec3 rayleighCol;
+            uniform vec3 mieCol;
+            uniform vec3 groundCol;
+            uniform float sunIntensity;
+            uniform float sunDiscSize;
+            uniform float exposure;
             varying vec3 vWorldPos;
+
+            // Henyey-Greenstein phase
+            float hgPhase(float cosT, float g) {
+                float g2 = g * g;
+                return (1.0 - g2) / (4.0 * 3.14159 * pow(1.0 + g2 - 2.0 * g * cosT, 1.5));
+            }
+
             void main() {
                 vec3 dir = normalize(vWorldPos);
-                float h = clamp(dir.y, -0.2, 1.0);
-                vec3 col = mix(horizonCol, midColor, smoothstep(0.0, 0.35, h));
-                col = mix(col, topColor, smoothstep(0.3, 0.95, h));
-                float sd = dot(dir, normalize(sunDir));
-                float disc = smoothstep(sunSize, 1.0, sd);
-                float halo = smoothstep(sunHaloSize, 1.0, sd);
-                col += sunColor * disc * 4.0;
-                col += sunColor * halo * 0.35;
+                float upDot = clamp(dir.y, -1.0, 1.0);
+                vec3 sd = normalize(sunDir);
+                float cosTheta = dot(dir, sd);
+
+                // Below-horizon ground
+                if (upDot < -0.02) {
+                    vec3 g = mix(groundCol, rayleighCol * 0.05, smoothstep(-0.02, 0.05, upDot));
+                    gl_FragColor = vec4(g, 1.0);
+                    return;
+                }
+
+                // Atmospheric thickness approximation
+                float zenith = 1.0 - upDot * 0.85;
+                float thickness = 1.0 / max(0.04, upDot + 0.08);
+
+                // Rayleigh (blue) scattering — more at zenith
+                float rayleighPhase = 0.75 * (1.0 + cosTheta * cosTheta);
+                vec3 rayleigh = rayleighCol * rayleighPhase * thickness * 0.55;
+
+                // Mie (forward, around sun) scattering — orange near horizon
+                float mie = hgPhase(cosTheta, 0.78);
+                vec3 mieScat = mieCol * mie * thickness * 1.2;
+
+                // Sun extinction toward horizon (warmer + redder near horizon)
+                float sunHeight = clamp(sd.y, 0.0, 1.0);
+                float horizonShift = pow(1.0 - sunHeight, 4.0);
+                vec3 sunTint = mix(vec3(1.0, 0.95, 0.85), vec3(1.0, 0.55, 0.25), horizonShift);
+
+                // Sun disc + glow
+                float disc = smoothstep(sunDiscSize, 1.0, cosTheta);
+                float glow = smoothstep(0.94, 1.0, cosTheta);
+                vec3 sunColor = sunTint * sunIntensity * (disc + glow * 0.4);
+
+                vec3 col = (rayleigh + mieScat) * sunTint;
+                col += sunColor;
+
+                // Horizon haze lift
+                float haze = pow(1.0 - max(upDot, 0.0), 6.0);
+                col = mix(col, vec3(1.05, 0.85, 0.70) * 0.75, haze * 0.55);
+
+                // Exposure & subtle ACES-ish tonemap
+                col *= exposure;
+                col = col / (col + 0.155) * 1.019;
+                col = pow(col, vec3(1.0 / 1.05));
+
                 gl_FragColor = vec4(col, 1.0);
             }
         `,
@@ -113,6 +158,47 @@ scene.add(rim);
 const bounce = new THREE.DirectionalLight(0xffcc88, 0.18);
 bounce.position.set(0, -20, 30);
 scene.add(bounce);
+
+// ---------- Lens flare (sun sprite + ghost ring) ----------
+function makeFlareTexture(color, falloff) {
+    const c = document.createElement("canvas");
+    c.width = c.height = 128;
+    const g = c.getContext("2d");
+    const grd = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+    grd.addColorStop(0, color);
+    grd.addColorStop(falloff, color.replace(/[\d.]+\)$/, "0.4)"));
+    grd.addColorStop(1, color.replace(/[\d.]+\)$/, "0)"));
+    g.fillStyle = grd;
+    g.fillRect(0, 0, 128, 128);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+}
+
+const sunFlareMat = new THREE.SpriteMaterial({
+    map: makeFlareTexture("rgba(255,230,180,1)", 0.3),
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthTest: false,
+    depthWrite: false,
+});
+const sunFlare = new THREE.Sprite(sunFlareMat);
+sunFlare.scale.set(180, 180, 1);
+sunFlare.renderOrder = 999;
+scene.add(sunFlare);
+
+const flareGhostMat = new THREE.SpriteMaterial({
+    map: makeFlareTexture("rgba(255,160,90,1)", 0.4),
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthTest: false,
+    depthWrite: false,
+    opacity: 0.55,
+});
+const flareGhost = new THREE.Sprite(flareGhostMat);
+flareGhost.scale.set(60, 60, 1);
+flareGhost.renderOrder = 998;
+scene.add(flareGhost);
 
 // ---------- Environment map (for PBR reflections) ----------
 function buildEnvMap() {
@@ -452,53 +538,132 @@ for (let i = 0; i < 160; i++) {
     trees.push(t);
 }
 
-// Multi-peak detailed mountains with snow caps + atmospheric tint
-function buildMountains() {
-    const group = new THREE.Group();
-    const rockMat = new THREE.MeshStandardMaterial({ color: 0x5e6f7e, roughness: 1, flatShading: true });
-    const distantMat = new THREE.MeshStandardMaterial({ color: 0x7d96b0, roughness: 1, flatShading: true });
-    const snowMat = new THREE.MeshStandardMaterial({ color: 0xf4f4f8, roughness: 0.6, flatShading: true });
-
-    // Near mountains (more saturated)
-    for (let i = 0; i < 40; i++) {
-        const side = i % 2 === 0 ? -1 : 1;
-        const x = side * (260 + Math.random() * 90);
-        const z = i * 50 - 300;
-        const h = 70 + Math.random() * 100;
-        const r = 50 + Math.random() * 35;
-        const seg = 5 + Math.floor(Math.random() * 3);
-        const m = new THREE.Mesh(new THREE.ConeGeometry(r, h, seg), rockMat);
-        m.position.set(x, h / 2 - 2, z);
-        m.rotation.y = Math.random() * Math.PI;
-        m.castShadow = true;
-        group.add(m);
-
-        // Snow cap on top third
-        if (h > 100) {
-            const snowH = h * 0.35;
-            const snowR = r * (snowH / h);
-            const snow = new THREE.Mesh(new THREE.ConeGeometry(snowR, snowH, seg), snowMat);
-            snow.position.set(x, h - snowH / 2 - 2, z);
-            snow.rotation.y = m.rotation.y;
-            group.add(snow);
-        }
-    }
-
-    // Far mountains (lighter, hazier — atmospheric perspective)
-    for (let i = 0; i < 30; i++) {
-        const side = i % 2 === 0 ? -1 : 1;
-        const x = side * (520 + Math.random() * 200);
-        const z = i * 80 - 400;
-        const h = 120 + Math.random() * 140;
-        const r = 80 + Math.random() * 50;
-        const m = new THREE.Mesh(new THREE.ConeGeometry(r, h, 5), distantMat);
-        m.position.set(x, h / 2 - 4, z);
-        group.add(m);
-    }
-
-    return group;
+// ---------- Heightmapped mountain terrain ----------
+// Multi-octave value-noise displaced plane meshes on each side of the highway
+function hash2(x, y) {
+    let n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+    return n - Math.floor(n);
 }
-scene.add(buildMountains());
+function valueNoise(x, y) {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    const xf = x - xi, yf = y - yi;
+    const a = hash2(xi, yi);
+    const b = hash2(xi + 1, yi);
+    const c = hash2(xi, yi + 1);
+    const d = hash2(xi + 1, yi + 1);
+    const u = xf * xf * (3 - 2 * xf);
+    const v = yf * yf * (3 - 2 * yf);
+    return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+function fbm(x, y, octaves) {
+    let sum = 0, amp = 1, freq = 1, norm = 0;
+    for (let i = 0; i < octaves; i++) {
+        sum += amp * valueNoise(x * freq, y * freq);
+        norm += amp;
+        amp *= 0.5;
+        freq *= 2.1;
+    }
+    return sum / norm;
+}
+
+// Rock + snow + dirt material (vertex-color blended via heights)
+function buildTerrainStrip(opts) {
+    const { width, depth, segW, segD, offsetX, offsetZ, maxH, ridgeFalloff, seedOff } = opts;
+    const geo = new THREE.PlaneGeometry(width, depth, segW, segD);
+    geo.rotateX(-Math.PI / 2);
+
+    const pos = geo.attributes.position;
+    const colors = [];
+    const colRock = new THREE.Color(0x5a6470);
+    const colRockDark = new THREE.Color(0x3a4048);
+    const colDirt = new THREE.Color(0x6e5a40);
+    const colGrass = new THREE.Color(0x4a6a2a);
+    const colSnow = new THREE.Color(0xf4f4f8);
+    const tmp = new THREE.Color();
+
+    for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i) + offsetX;
+        const z = pos.getZ(i) + offsetZ;
+
+        // Falloff: lower near road, taller far away
+        const dist = Math.abs(x - offsetX);
+        const falloff = Math.pow(Math.min(1, dist / ridgeFalloff), 1.6);
+
+        const n = fbm((x + seedOff) * 0.006, (z + seedOff) * 0.006, 5);
+        const ridge = Math.pow(n, 1.8);
+        const h = ridge * maxH * falloff;
+
+        pos.setY(i, h);
+
+        // Color by altitude + steepness
+        const ratio = Math.min(1, h / (maxH * 0.7));
+        if (ratio < 0.2) tmp.copy(colGrass);
+        else if (ratio < 0.45) tmp.copy(colDirt).lerp(colRock, (ratio - 0.2) / 0.25);
+        else if (ratio < 0.75) tmp.copy(colRock).lerp(colRockDark, (ratio - 0.45) / 0.3);
+        else tmp.copy(colRockDark).lerp(colSnow, (ratio - 0.75) / 0.25);
+
+        // Slight noise tint
+        const tint = 0.85 + valueNoise(x * 0.05, z * 0.05) * 0.3;
+        colors.push(tmp.r * tint, tmp.g * tint, tmp.b * tint);
+    }
+
+    geo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+    geo.computeVertexNormals();
+
+    const mat = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.96,
+        metalness: 0.0,
+        flatShading: false,
+        envMapIntensity: 0.3,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(offsetX, -2, offsetZ);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    return mesh;
+}
+
+// Left ridge
+const leftTerrain = buildTerrainStrip({
+    width: 700, depth: 2200,
+    segW: 70, segD: 220,
+    offsetX: -350, offsetZ: 800,
+    maxH: 180, ridgeFalloff: 280, seedOff: 0,
+});
+scene.add(leftTerrain);
+
+// Right ridge
+const rightTerrain = buildTerrainStrip({
+    width: 700, depth: 2200,
+    segW: 70, segD: 220,
+    offsetX: 350, offsetZ: 800,
+    maxH: 180, ridgeFalloff: 280, seedOff: 9000,
+});
+scene.add(rightTerrain);
+
+// Far hazy backdrop
+const farMat = new THREE.MeshBasicMaterial({ color: 0xa6b8c8, fog: true });
+for (let i = 0; i < 6; i++) {
+    const w = 600 + Math.random() * 300;
+    const h = 200 + Math.random() * 150;
+    const shape = new THREE.Shape();
+    shape.moveTo(-w/2, 0);
+    let x = -w/2;
+    const steps = 14;
+    for (let s = 1; s <= steps; s++) {
+        x += w / steps;
+        const y = h * (0.4 + 0.6 * Math.sin(s * 0.7 + i * 1.3) * 0.5 + 0.5 * Math.random());
+        shape.lineTo(x, Math.max(20, y));
+    }
+    shape.lineTo(w/2, 0);
+    shape.lineTo(-w/2, 0);
+    const geo = new THREE.ShapeGeometry(shape);
+    const m = new THREE.Mesh(geo, farMat);
+    m.position.set((i % 2 === 0 ? -1 : 1) * (600 + i * 30), 0, 1000 + i * 100);
+    m.rotation.y = (i % 2 === 0 ? 0.2 : -0.2);
+    scene.add(m);
+}
 
 // ---------- Volumetric ground fog ----------
 function makeFogLayer() {
@@ -1073,6 +1238,50 @@ const carData = buildCar();
 const car = carData.group;
 scene.add(car);
 
+// ---------- Dynamic cube reflection on car body ----------
+// Put the car on its own layer so the cube camera can exclude it from
+// reflections (otherwise the car reflects itself).
+const CAR_LAYER = 1;
+car.traverse(o => {
+    if (o.isMesh) o.layers.set(CAR_LAYER);
+});
+camera.layers.enable(CAR_LAYER); // main camera renders both world + car
+
+const cubeRT = new THREE.WebGLCubeRenderTarget(128, {
+    generateMipmaps: true,
+    minFilter: THREE.LinearMipmapLinearFilter,
+});
+cubeRT.texture.type = THREE.HalfFloatType;
+const cubeCam = new THREE.CubeCamera(0.1, 800, cubeRT);
+// CubeCamera's 6 internal cameras keep default layer 0 = car (layer 1) excluded
+car.add(cubeCam);
+
+// Assign cubeRT as environment for car's body materials so we get true
+// world reflections in addition to the PMREM ambient.
+function applyCubeReflectionToCar() {
+    car.traverse(o => {
+        if (o.isMesh && o.material) {
+            const mats = Array.isArray(o.material) ? o.material : [o.material];
+            for (const m of mats) {
+                if (m.isMeshPhysicalMaterial || m.isMeshStandardMaterial) {
+                    m.envMap = cubeRT.texture;
+                    m.needsUpdate = true;
+                }
+            }
+        }
+    });
+}
+applyCubeReflectionToCar();
+
+let cubeFrame = 0;
+function updateCubeReflection() {
+    cubeFrame++;
+    if (cubeFrame % 2 !== 0) return; // every other frame for perf
+    // Position the cube camera at car center, hide car, render.
+    cubeCam.position.set(0, 0.7, 0);
+    cubeCam.update(renderer, scene);
+}
+
 // ---------- Game state ----------
 const state = {
     mode: "menu",
@@ -1364,6 +1573,25 @@ function updateCamera(dt) {
     sun.target.position.set(camera.position.x, 0, camera.position.z + 20);
     sun.target.updateMatrixWorld();
 
+    // Lens flare: place sun sprite far along SUN_DIR, ghost mirrored across center
+    const flareDist = 800;
+    sunFlare.position.set(
+        camera.position.x + SUN_DIR.x * flareDist,
+        camera.position.y + SUN_DIR.y * flareDist,
+        camera.position.z + SUN_DIR.z * flareDist,
+    );
+    // Ghost mirrored across viewport center along the same vector
+    flareGhost.position.set(
+        camera.position.x - SUN_DIR.x * flareDist * 0.6,
+        camera.position.y + SUN_DIR.y * flareDist * 0.5,
+        camera.position.z - SUN_DIR.z * flareDist * 0.6,
+    );
+    // Fade flare if the sun is behind the camera
+    const viewDir = new THREE.Vector3().subVectors(camTarget, camera.position).normalize();
+    const sunAlign = Math.max(0, viewDir.dot(SUN_DIR));
+    sunFlareMat.opacity = 0.55 * sunAlign;
+    flareGhostMat.opacity = 0.4 * sunAlign;
+
     // ---- CSS post-fx driven by speed ----
     const blur = Math.max(0, (state.speed - 35) / 8); // px
     document.documentElement.style.setProperty("--motion-blur", `${Math.min(blur, 3.5).toFixed(2)}px`);
@@ -1429,6 +1657,7 @@ function loop(now) {
     last = now;
     update(dt);
     updateCamera(dt);
+    updateCubeReflection();
     renderer.render(scene, camera);
     requestAnimationFrame(loop);
 }
