@@ -54,13 +54,15 @@
     </div>
 </div>
 
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
-  }
-}
+<div id="error-banner" style="display:none;position:absolute;top:0;left:0;right:0;padding:12px;background:#c1121f;color:#fff;z-index:100;font-family:monospace;font-size:13px;white-space:pre-wrap;"></div>
+<script>
+window.addEventListener("error", (e) => {
+    const el = document.getElementById("error-banner");
+    el.style.display = "block";
+    el.textContent = "에러: " + (e.message || e.error) + "\n" + (e.filename || "") + ":" + (e.lineno || "");
+});
 </script>
-<script type="module" src="game.js"></script>
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+<script src="game.js"></script>
 </body>
 </html>

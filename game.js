@@ -1,4 +1,5 @@
-import * as THREE from "three";
+// THREE is loaded as a global via <script> tag in index.html.
+(function () {
 
 // ---------- Setup ----------
 const canvas = document.getElementById("game");
@@ -765,3 +766,5 @@ camTarget.set(start.x, 1, start.z);
 camera.lookAt(camTarget);
 
 requestAnimationFrame(loop);
+
+})();
