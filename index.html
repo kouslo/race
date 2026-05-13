@@ -15,6 +15,7 @@
         <div class="hud-item" id="stage-item">STAGE <span id="stage">1</span> · <span id="stage-name">CRUISE</span></div>
         <div class="hud-item">시간: <span id="time">0.00</span>s</div>
         <div class="hud-item">베스트: <span id="best">--</span></div>
+        <div class="hud-item">🪙 <span id="coins">0</span> · <span id="run-coins">0</span></div>
         <div class="hud-item hp-wrap">
             HP <span id="hp-text">100</span>
             <div class="hp-bar"><div id="hp-fill"></div></div>
@@ -48,19 +49,16 @@
     <div id="stage-banner"></div>
 
     <div id="overlay" class="overlay">
-        <div class="panel">
-            <h1>3D 레이싱</h1>
-            <p>방향키 또는 WASD로 차량을 조종하세요</p>
-            <p style="color:#ffd166;font-weight:600;">5차선 엔드리스 모드 — HP 100</p>
-            <p>차선을 바꿔가며 장애물을 피해 최대한 멀리 가세요!</p>
-            <ul class="controls">
-                <li><b>← / A</b> : 왼쪽 차선으로</li>
-                <li><b>→ / D</b> : 오른쪽 차선으로</li>
-                <li><b>↑ / W</b> : 가속</li>
-                <li><b>↓ / S</b> : 감속</li>
-                <li><b>Shift</b> : 니트로 부스터 (무적 · 게이지 필요)</li>
-                <li><b>C</b> : 카메라 시점 전환</li>
-                <li><b>R</b> : 재시작</li>
+        <div class="panel garage-panel">
+            <h1>GARAGE</h1>
+            <div class="garage-stats">
+                <span>🪙 <b id="profile-coins">0</b></span>
+                <span>📏 베스트 <b id="profile-best">0</b> m</span>
+            </div>
+            <div id="garage-grid"></div>
+            <p class="hint">← / → 키 또는 차량 클릭으로 선택</p>
+            <ul class="controls compact">
+                <li><b>← / →</b> 차선 · <b>↑ / ↓</b> 가/감속 · <b>Shift</b> 니트로 · <b>C</b> 시점 · <b>R</b> 재시작</li>
             </ul>
             <button id="start-btn">출발!</button>
         </div>
@@ -72,7 +70,9 @@
             <p>주행 거리: <b style="color:#ffd166;font-size:24px;"><span id="final-distance">0</span> m</b></p>
             <p>생존 시간: <span id="final-time">0.00</span>초</p>
             <p>최고 속도: <span id="final-top">0</span> km/h</p>
+            <p>획득 코인: 🪙 <span id="final-coins">0</span></p>
             <button id="restart-btn">다시 시작</button>
+            <button id="garage-btn" style="margin-left:8px;background:linear-gradient(135deg,#1ec8ff,#2080ff);color:#fff;">차고로</button>
         </div>
     </div>
 </div>
