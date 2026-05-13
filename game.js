@@ -1044,12 +1044,14 @@ function update(dt) {
     const accelerating = keys["arrowup"] || keys["w"];
     const reversing = keys["arrowdown"] || keys["s"];
 
-    // Lane change (edge triggered — one press = one lane)
+    // Lane change (edge triggered — one press = one lane).
+    // Camera looks down +Z so world +X projects to screen LEFT; we flip so
+    // pressing Left visually moves the car left.
     if (justPressed["arrowleft"] || justPressed["a"]) {
-        if (state.currentLane > 0) state.currentLane--;
+        if (state.currentLane < NUM_LANES - 1) state.currentLane++;
     }
     if (justPressed["arrowright"] || justPressed["d"]) {
-        if (state.currentLane < NUM_LANES - 1) state.currentLane++;
+        if (state.currentLane > 0) state.currentLane--;
     }
     // clear edge triggers
     justPressed["arrowleft"] = false;
