@@ -125,3 +125,27 @@ button:hover {
 }
 
 button:active { transform: translateY(0); }
+
+#mute-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    z-index: 10;
+    margin: 0;
+    padding: 8px 14px;
+    font-size: 13px;
+    background: rgba(0, 0, 0, 0.6);
+    color: #ffd166;
+    border: 1px solid rgba(255, 209, 102, 0.4);
+    backdrop-filter: blur(6px);
+}
+
+#mute-btn:hover {
+    background: rgba(0, 0, 0, 0.8);
+    box-shadow: 0 4px 12px rgba(255, 209, 102, 0.2);
+}
+
+#mute-btn.muted {
+    color: #888;
+    border-color: rgba(255, 255, 255, 0.2);
+}

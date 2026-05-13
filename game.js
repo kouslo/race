@@ -746,11 +746,228 @@ function loop(now) {
     requestAnimationFrame(loop);
 }
 
+// ---------- BGM (procedural synth) ----------
+const bgm = {
+    ctx: null,
+    masterGain: null,
+    started: false,
+    muted: false,
+    timer: null,
+    step: 0,
+};
+
+function startBGM() {
+    if (bgm.started) {
+        if (bgm.ctx.state === "suspended") bgm.ctx.resume();
+        return;
+    }
+    bgm.started = true;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    bgm.ctx = new AC();
+    const ctx = bgm.ctx;
+
+    bgm.masterGain = ctx.createGain();
+    bgm.masterGain.gain.value = bgm.muted ? 0 : 0.35;
+
+    // Light reverb-ish delay
+    const delay = ctx.createDelay();
+    delay.delayTime.value = 0.18;
+    const feedback = ctx.createGain();
+    feedback.gain.value = 0.25;
+    const wet = ctx.createGain();
+    wet.gain.value = 0.18;
+    delay.connect(feedback).connect(delay);
+    delay.connect(wet).connect(bgm.masterGain);
+    bgm.masterGain.connect(ctx.destination);
+
+    const sendFx = (node) => { node.connect(bgm.masterGain); node.connect(delay); };
+
+    // Pulse-wave-ish lead via two detuned sawtooths
+    function playLead(freq, t, dur, vol = 0.18) {
+        const o1 = ctx.createOscillator();
+        const o2 = ctx.createOscillator();
+        o1.type = "sawtooth";
+        o2.type = "sawtooth";
+        o1.frequency.value = freq;
+        o2.frequency.value = freq * 1.005;
+        const filter = ctx.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.setValueAtTime(800, t);
+        filter.frequency.exponentialRampToValueAtTime(3200, t + 0.05);
+        filter.frequency.exponentialRampToValueAtTime(1200, t + dur);
+        filter.Q.value = 6;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(vol, t + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        o1.connect(filter); o2.connect(filter);
+        filter.connect(g);
+        sendFx(g);
+        o1.start(t); o2.start(t);
+        o1.stop(t + dur + 0.05); o2.stop(t + dur + 0.05);
+    }
+
+    // Bass: square with envelope
+    function playBass(freq, t, dur, vol = 0.35) {
+        const o = ctx.createOscillator();
+        o.type = "square";
+        o.frequency.value = freq;
+        const filter = ctx.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.value = 600;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(vol, t + 0.005);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        o.connect(filter).connect(g);
+        g.connect(bgm.masterGain);
+        o.start(t);
+        o.stop(t + dur + 0.05);
+    }
+
+    function playKick(t) {
+        const o = ctx.createOscillator();
+        o.type = "sine";
+        o.frequency.setValueAtTime(140, t);
+        o.frequency.exponentialRampToValueAtTime(45, t + 0.12);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.6, t);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+        o.connect(g).connect(bgm.masterGain);
+        o.start(t); o.stop(t + 0.2);
+    }
+
+    function playSnare(t) {
+        const bufSize = ctx.sampleRate * 0.18;
+        const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+        const noise = ctx.createBufferSource();
+        noise.buffer = buf;
+        const hp = ctx.createBiquadFilter();
+        hp.type = "highpass";
+        hp.frequency.value = 1500;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.35, t);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+        noise.connect(hp).connect(g).connect(bgm.masterGain);
+        noise.start(t); noise.stop(t + 0.18);
+    }
+
+    function playHat(t, open = false) {
+        const bufSize = ctx.sampleRate * 0.05;
+        const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+        const noise = ctx.createBufferSource();
+        noise.buffer = buf;
+        const hp = ctx.createBiquadFilter();
+        hp.type = "highpass";
+        hp.frequency.value = 7000;
+        const g = ctx.createGain();
+        const decay = open ? 0.12 : 0.04;
+        g.gain.setValueAtTime(0.15, t);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
+        noise.connect(hp).connect(g).connect(bgm.masterGain);
+        noise.start(t); noise.stop(t + decay + 0.02);
+    }
+
+    // 140 BPM driving rock/synth loop in Am
+    // Chord roots: Am - F - C - G (8 bars total, 2 bars each)
+    const BPM = 140;
+    const BEAT = 60 / BPM;          // 0.4285s per beat
+    const SIXTEENTH = BEAT / 4;
+    const BARS_PER_LOOP = 8;
+    const STEPS_PER_BAR = 16;
+    const TOTAL_STEPS = BARS_PER_LOOP * STEPS_PER_BAR;
+
+    // MIDI helpers
+    const note = (n) => 440 * Math.pow(2, (n - 69) / 12);
+
+    // Bass pattern (one root per beat with octave kicks)
+    const rootByBar = [57, 57, 53, 53, 60, 60, 55, 55]; // A2, F2, C3, G2
+    const bassPattern = [1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1]; // 16 steps
+
+    // Lead melody (semitone offsets from Am scale), -1 = rest
+    const leadMelody = [
+        // bar 1
+        12, -1, 15, -1, 17, -1, 19, 17, 15, -1, 12, -1, 10, -1, 12, -1,
+        // bar 2
+        15, -1, 17, -1, 19, 17, 15, -1, 12, -1, 15, -1, 17, 19, 22, -1,
+        // bar 3 (F)
+        8, -1, 12, -1, 15, -1, 17, -1, 15, -1, 12, -1, 8, -1, 12, -1,
+        // bar 4
+        12, -1, 15, 17, 19, 17, 15, 12, 10, -1, 12, -1, 8, -1, -1, -1,
+        // bar 5 (C)
+        12, -1, 15, -1, 19, -1, 22, -1, 19, -1, 15, -1, 12, -1, 15, -1,
+        // bar 6
+        19, -1, 22, -1, 24, 22, 19, 15, 17, -1, 19, -1, 22, -1, -1, -1,
+        // bar 7 (G)
+        14, -1, 17, -1, 19, -1, 22, 19, 17, -1, 14, -1, 12, -1, 14, -1,
+        // bar 8
+        17, -1, 19, -1, 22, 19, 17, 14, 12, -1, 10, -1, 12, -1, -1, -1,
+    ];
+
+    bgm.step = 0;
+    let nextStepTime = ctx.currentTime + 0.1;
+
+    function scheduler() {
+        const lookAhead = 0.15;
+        while (nextStepTime < ctx.currentTime + lookAhead) {
+            const s = bgm.step % TOTAL_STEPS;
+            const bar = Math.floor(s / STEPS_PER_BAR);
+            const stepInBar = s % STEPS_PER_BAR;
+            const root = rootByBar[bar];
+
+            // Drums
+            if (stepInBar % 8 === 0) playKick(nextStepTime);                // beats 1, 3
+            if (stepInBar === 4 || stepInBar === 12) playSnare(nextStepTime); // beats 2, 4
+            if (stepInBar % 2 === 0) playHat(nextStepTime, stepInBar === 14); // 8ths
+
+            // Bass
+            if (bassPattern[stepInBar]) {
+                const bf = note(root - 12);
+                playBass(bf, nextStepTime, SIXTEENTH * 1.8, 0.3);
+            }
+
+            // Lead (8ths only, on even steps)
+            const lm = leadMelody[s];
+            if (lm !== -1 && stepInBar % 2 === 0) {
+                playLead(note(root + lm), nextStepTime, SIXTEENTH * 2.6, 0.14);
+            }
+
+            nextStepTime += SIXTEENTH;
+            bgm.step++;
+        }
+    }
+
+    bgm.timer = setInterval(scheduler, 25);
+}
+
+function toggleMute() {
+    bgm.muted = !bgm.muted;
+    if (bgm.masterGain) {
+        bgm.masterGain.gain.linearRampToValueAtTime(
+            bgm.muted ? 0 : 0.35,
+            bgm.ctx.currentTime + 0.1
+        );
+    }
+    const btn = document.getElementById("mute-btn");
+    btn.textContent = bgm.muted ? "♪ OFF" : "♪ ON";
+    btn.classList.toggle("muted", bgm.muted);
+}
+
+document.getElementById("mute-btn").addEventListener("click", () => {
+    if (!bgm.started) startBGM();
+    toggleMute();
+});
+
 // ---------- UI ----------
 document.getElementById("start-btn").addEventListener("click", () => {
     document.getElementById("overlay").classList.add("hidden");
     state.mode = "playing";
     resetCar();
+    startBGM();
 });
 document.getElementById("restart-btn").addEventListener("click", () => {
     document.getElementById("finish-overlay").classList.add("hidden");
