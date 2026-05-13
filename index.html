@@ -3,29 +3,41 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>레이싱 게임</title>
+<title>3D 레이싱 게임</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div id="game-container">
     <div id="hud">
         <div class="hud-item">속도: <span id="speed">0</span> km/h</div>
+        <div class="hud-item">기어: <span id="gear">N</span></div>
         <div class="hud-item">랩: <span id="lap">1</span> / <span id="total-laps">3</span></div>
         <div class="hud-item">시간: <span id="time">0.00</span>s</div>
         <div class="hud-item">베스트: <span id="best">--</span></div>
     </div>
 
-    <canvas id="game" width="900" height="600"></canvas>
+    <div id="speedometer">
+        <svg viewBox="0 0 200 200" width="160" height="160">
+            <circle cx="100" cy="100" r="92" fill="rgba(0,0,0,0.6)" stroke="#ffd166" stroke-width="2"/>
+            <g id="ticks"></g>
+            <line id="needle" x1="100" y1="100" x2="100" y2="30" stroke="#ef476f" stroke-width="3" stroke-linecap="round" transform="rotate(-120 100 100)"/>
+            <circle cx="100" cy="100" r="8" fill="#ffd166"/>
+            <text x="100" y="160" text-anchor="middle" fill="#fff" font-size="14" font-family="Courier New">km/h</text>
+        </svg>
+    </div>
+
+    <canvas id="game"></canvas>
 
     <div id="overlay" class="overlay">
         <div class="panel">
-            <h1>레이싱 게임</h1>
+            <h1>3D 레이싱</h1>
             <p>방향키 또는 WASD로 차량을 조종하세요</p>
             <ul class="controls">
                 <li><b>↑ / W</b> : 가속</li>
                 <li><b>↓ / S</b> : 후진 / 브레이크</li>
                 <li><b>← / A</b>, <b>→ / D</b> : 좌우 회전</li>
-                <li><b>Space</b> : 핸드 브레이크 (드리프트)</li>
+                <li><b>Space</b> : 핸드 브레이크</li>
+                <li><b>C</b> : 카메라 시점 전환</li>
                 <li><b>R</b> : 재시작</li>
             </ul>
             <button id="start-btn">출발!</button>
@@ -41,6 +53,14 @@
         </div>
     </div>
 </div>
-<script src="game.js"></script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+<script type="module" src="game.js"></script>
 </body>
 </html>
