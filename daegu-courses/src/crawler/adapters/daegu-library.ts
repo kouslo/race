@@ -37,8 +37,13 @@ const SEL = {
   capacity: ".capacity, td.capacity",
 } as const;
 
-/** Detail-URL query keys that uniquely identify a course at this CMS. */
-const EXTERNAL_ID_KEYS = ["lct_seq", "seq", "idx", "id", "no"];
+/**
+ * Detail-URL query keys that uniquely identify a course at this CMS.
+ * `crsUid` is the canonical course UID observed on this CMS
+ * (e.g., /module/course/detail.do?...&crsUid=29325). The others are
+ * fallbacks for related modules that share the same shell.
+ */
+const EXTERNAL_ID_KEYS = ["crsUid", "lct_seq", "seq", "idx", "id", "no"];
 
 export const daeguLibraryAdapter: CourseAdapter = {
   key: "daegu-library-v1",
