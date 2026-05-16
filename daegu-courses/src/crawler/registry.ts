@@ -1,5 +1,6 @@
 import type { CourseAdapter } from "./types";
 import { daeguArtsCenterAdapter } from "./adapters/daegu-arts-center";
+import { daeguLibraryAdapter } from "./adapters/daegu-library";
 
 const adapters = new Map<string, CourseAdapter>();
 
@@ -11,6 +12,7 @@ function register(adapter: CourseAdapter) {
 }
 
 register(daeguArtsCenterAdapter);
+register(daeguLibraryAdapter);
 
 export function getAdapter(key: string): CourseAdapter {
   const a = adapters.get(key);
