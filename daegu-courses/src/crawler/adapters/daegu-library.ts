@@ -1,27 +1,62 @@
-import type { AdapterContext, AdapterResult, CourseAdapter, ParsedCourse } from "../types";
+import type { AdapterContext, AdapterResult, CourseAdapter, Fetcher, ParsedCourse } from "../types";
 import type { CourseScheduleSlot } from "../../db/schema/courses";
 
 /**
  * Adapter for the Daegu public library shared CMS.
  *
- * The course listing page is a SPA that fetches `/<hmpgUid>/courses` from
- * a JSON API (CA_API_HOST). We bypass the HTML entirely and hit the API
- * directly. One adapter handles every branch on this CMS — the branch
- * (donggu / dongbu / beomeo / …) and any category filter come from the
- * sourceUrl's path and query string.
+ * The course listing page is a SPA; this adapter bypasses HTML scraping
+ * and calls the underlying JSON API discovered in CNDAjax.js:
  *
- * Set `DAEGU_LIBRARY_CMS_API_HOST` in the environment to the API origin
- * (e.g., https://example-cul-api.kr-region.gov-nhncloudservice.com).
+ *   token:    GET https://library.daegu.go.kr/token.do
+ *             → { jwt, expiresAt }
+ *   listing:  GET https://library-ssl.daegu.go.kr/apply/api/v1/cul/apply/<hmpgUid>/courses
+ *             Authorization: Bearer <jwt>
+ *
+ * One adapter handles every branch (donggu / dongbu / beomeo / …);
+ * branch and category filter come from the sourceUrl.
+ *
+ * Hosts can be overridden by env for staging or schema changes upstream:
+ *   DAEGU_LIBRARY_TOKEN_URL
+ *   DAEGU_LIBRARY_API_BASE
  */
-const CA_API_HOST = process.env.DAEGU_LIBRARY_CMS_API_HOST?.replace(/\/$/, "");
+const TOKEN_URL =
+  process.env.DAEGU_LIBRARY_TOKEN_URL ?? "https://library.daegu.go.kr/token.do";
+const API_BASE =
+  process.env.DAEGU_LIBRARY_API_BASE ??
+  "https://library-ssl.daegu.go.kr/apply/api/v1/cul/apply";
 
-/** Map URL subdirectory → default homepage_id used by the API when not given. */
+/** Default homepage_id when not present in the URL. */
 const BRANCH_DEFAULT_HMPG: Record<string, string> = {
   donggu: "h73",
   beomeo: "h50",
   yonghak: "h51",
   gosan: "h52",
 };
+
+type TokenResponse = { jwt: string; expiresAt: number };
+
+let cachedToken: { jwt: string; expiresAt: number } | null = null;
+let inflightToken: Promise<string> | null = null;
+
+async function getJwt(fetcher: Fetcher): Promise<string> {
+  if (cachedToken && Date.now() < cachedToken.expiresAt - 3000) {
+    return cachedToken.jwt;
+  }
+  if (inflightToken) return inflightToken;
+  inflightToken = fetcher
+    .json<TokenResponse>(TOKEN_URL)
+    .then((res) => {
+      if (!res?.jwt || !res?.expiresAt) {
+        throw new Error("token.do returned an invalid payload");
+      }
+      cachedToken = { jwt: res.jwt, expiresAt: res.expiresAt };
+      return res.jwt;
+    })
+    .finally(() => {
+      inflightToken = null;
+    });
+  return inflightToken;
+}
 
 type ApiCourse = {
   crsUid: number | string;
@@ -67,12 +102,6 @@ export const daeguLibraryAdapter: CourseAdapter = {
 
   async run(ctx: AdapterContext): Promise<AdapterResult> {
     const { sourceUrl, fetcher, logger } = ctx;
-    if (!CA_API_HOST) {
-      throw new Error(
-        "DAEGU_LIBRARY_CMS_API_HOST is not set — required by daegu-library-v1.",
-      );
-    }
-
     const u = new URL(sourceUrl);
     const branch = u.pathname.split("/").filter(Boolean)[0];
     const homepageId =
@@ -86,13 +115,18 @@ export const daeguLibraryAdapter: CourseAdapter = {
       );
     }
 
-    const apiUrl = new URL(`${CA_API_HOST}/${homepageId}/courses`);
+    const apiUrl = new URL(`${API_BASE}/${homepageId}/courses`);
     if (menuIdx) apiUrl.searchParams.set("menu_idx", menuIdx);
     if (searchCate1) apiUrl.searchParams.set("lclsfUid", searchCate1);
     apiUrl.searchParams.set("prntCd", "15");
 
+    const jwt = await getJwt(fetcher);
     const res = await fetcher.json<ApiResponse>(apiUrl.toString(), {
-      headers: { Accept: "application/json", Referer: sourceUrl },
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${jwt}`,
+        Referer: sourceUrl,
+      },
     });
 
     const list = res.data?.courseList ?? [];
@@ -125,7 +159,6 @@ function toParsedCourse(i: ApiCourse, branch: string, menuIdx: string): ParsedCo
   return {
     externalId: `crsUid=${i.crsUid}`,
     title: i.crsNm,
-    description: undefined,
     tags: i.groupNm ? [i.groupNm] : [],
     targetAudience: i.crsTrgt || undefined,
     capacity,
@@ -148,7 +181,6 @@ function toNum(v: unknown): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-/** "2025-03-01" / "2025.03.01" / "20250301" → "2025-03-01" */
 function parseYmd(s?: string): string | undefined {
   if (!s) return undefined;
   const compact = s.match(/^(\d{4})(\d{2})(\d{2})$/);
@@ -158,7 +190,6 @@ function parseYmd(s?: string): string | undefined {
   return undefined;
 }
 
-/** Combine YMD + "HH:mm" / "HHmm" into a KST-anchored Date. */
 function parseYmdHm(ymd?: string, hm?: string): Date | undefined {
   const date = parseYmd(ymd);
   if (!date) return undefined;
@@ -172,11 +203,9 @@ function parseYmdHm(ymd?: string, hm?: string): Date | undefined {
       mm = Number(m[2]);
     }
   }
-  // KST = UTC+9, no DST.
   return new Date(Date.UTC(Number(y), Number(mo) - 1, Number(d), hh - 9, mm));
 }
 
-/** crsDowArr uses "1"=일 … "7"=토. Our schema uses MON–SUN labels. */
 const DOW_MAP: Record<string, CourseScheduleSlot["dayOfWeek"]> = {
   "1": "SUN",
   "2": "MON",
@@ -206,18 +235,12 @@ function normalizeTime(t?: string): string | undefined {
 }
 
 /**
- * crsStatus codes observed in renderCrsList:
- *   0  수강신청       → open
- *   1  대기자신청     → open
- *   2  신청완료       → open  (personal state; treat as still open in catalog)
- *   3  대기자신청완료 → open
- *   4  접수마감       → closed
- *   5  정원마감       → full
- *   6  접수예정       → upcoming
- *   9  수강종료       → closed
- *  10  신청완료(alt)  → open
- *  11  접수중         → open
- *  12  수업중         → closed (catalog-wise: no more applications)
+ * crsStatus codes (from renderCrsList):
+ *   0/1/2/3/10/11 → open (수강신청·대기·접수중·신청완료 상태들)
+ *   4              → closed (접수마감)
+ *   5              → full   (정원마감)
+ *   6              → upcoming (접수예정)
+ *   9/12           → closed (수강종료·수업중 — catalog-wise no more applications)
  */
 function mapStatus(code: ApiCourse["crsStatus"]): ParsedCourse["status"] {
   const c = String(code);
