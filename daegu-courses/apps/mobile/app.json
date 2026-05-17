@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "대구 강좌",
+    "slug": "daegu-courses",
+    "scheme": "daegucourses",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "apiBaseUrl": "http://localhost:3000"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "kr.daegucourses.app"
+    },
+    "android": {
+      "package": "kr.daegucourses.app"
+    }
+  }
+}

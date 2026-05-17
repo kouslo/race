@@ -1,46 +1,66 @@
-# daegu-courses (DB layer)
+# daegu-courses
 
-대구 강좌·문화행사 통합 플랫폼의 데이터베이스 스키마. Drizzle ORM + PostgreSQL.
+대구 전역의 강좌·문화행사를 한 곳에서 통합 조회·신청하도록 돕는 플랫폼.
+Turborepo + pnpm 모노레포. 백엔드(크롤러·API)는 공유, UI는 웹과 앱을 각각 네이티브 수준으로.
 
-## 구조
+## 워크스페이스
 
 ```
-src/db/
-  schema/
-    enums.ts             pgEnum 정의 (지역, 카테고리, 상태 등)
-    institutions.ts      기관 마스터
-    crawl-sources.ts     크롤링 URL 등록 + 실행 로그
-    courses.ts           강좌
-    events.ts            문화행사
-    users.ts             사용자, 즐겨찾기, 알림 구독, 검색 기록
-    index.ts             통합 export
-  client.ts              Drizzle 클라이언트
-  migrations/            (생성됨) db:generate 결과
-drizzle.config.ts
+apps/
+  api/            Hono REST API + Drizzle DB + 크롤러
+  web/            Next.js 15 (App Router) — 강좌/행사 검색·상세
+  mobile/         Expo SDK 52 + Expo Router — 모바일 앱
+packages/
+  api-schemas/    Zod 스키마 (요청/응답 계약, 서버·클라이언트 공유)
+  api-client/     타입 안전 fetch 래퍼 (웹·모바일 공통)
+  tsconfig/       공통 tsconfig 프리셋 (base/node/next/expo)
 ```
 
-## 사용법
+## 빠른 시작
 
 ```bash
-# 1. 의존성 설치
-npm install
+# 사전: pnpm, Node 20+, PostgreSQL
+npm install -g pnpm
+pnpm install
 
-# 2. PostgreSQL 준비 후 .env 작성
-cp .env.example .env
+# 1) DB 준비
+cp apps/api/.env.example apps/api/.env   # DATABASE_URL 등 설정
+pnpm db:push                              # 스키마 적용
+pnpm db:seed                              # 도서관 3곳 + crawl_sources 등록
+pnpm crawl:all                            # 첫 크롤링
 
-# 3. 마이그레이션 SQL 생성
-npm run db:generate
+# 2) 동시 실행 (turbo)
+pnpm dev                                  # api + web + mobile 동시
 
-# 4-a. 마이그레이션 적용 (운영)
-npm run db:migrate
-
-# 4-b. 또는 스키마 직접 푸시 (개발 초기)
-npm run db:push
+# 또는 개별
+pnpm api:dev                              # http://localhost:3000
+pnpm web:dev                              # http://localhost:3001
+pnpm mobile:dev                           # Expo dev server
 ```
 
-## 핵심 설계
+## 데이터 흐름
 
-- `crawl_sources`: 사용자가 기관별 강좌 페이지 URL을 등록하는 테이블. `adapterKey`로 파서 매핑.
-- `courses` / `events`: `(institutionId, externalId)` 유니크 → 중복 없이 upsert.
-- `lastSeenAt`: 크롤링 시 갱신, 일정 기간 미갱신 시 `status='closed'` 처리.
-- `rawData`: 파싱 원본 보존 → 어댑터 개선 시 재처리 가능.
+```
+사용자가 crawl_sources에 기관 URL 등록
+      ↓
+크롤러(어댑터별) JSON/HTML 파싱
+      ↓
+PostgreSQL (Drizzle) - courses / events upsert
+      ↓
+Hono API (Zod 검증)
+      ↓
+Next.js Web · Expo Mobile (api-client 공유)
+```
+
+## 핵심 설계 결정
+
+- **UI 컴포넌트는 공유하지 않음** — 웹은 Next.js+CSS, 모바일은 React Native로 각각 최적. 비즈니스 로직과 API 계약만 공유 (`api-schemas`, `api-client`).
+- **크롤러 어댑터 패턴** — 기관마다 어댑터 파일 하나. `crawl_sources.adapter_key`로 자동 라우팅.
+- **idempotent upsert** — `(institutionId, externalId)` 유니크. 매번 크롤링해도 중복 없음. 안 보이는 강좌는 자동 soft-close.
+- **API 계약은 Zod** — 서버 검증과 클라이언트 타입이 동일 소스.
+
+## 자세한 문서
+
+- 백엔드: `apps/api/README.md`, `apps/api/src/crawler/README.md`
+- 웹: `apps/web/` (Next.js App Router)
+- 모바일: `apps/mobile/` (Expo Router)

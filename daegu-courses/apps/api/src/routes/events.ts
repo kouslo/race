@@ -5,7 +5,7 @@ import { z } from "zod";
 import { db } from "../../db/client";
 import { events } from "../../db/schema/events";
 import { institutions } from "../../db/schema/institutions";
-import { eventsListQuery, type ListResponse } from "../schemas";
+import { eventsListQuery, type ListResponse } from "@daegu-courses/api-schemas";
 import { zErr } from "../context";
 
 export const eventsRoute = new Hono();

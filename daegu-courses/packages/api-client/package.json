@@ -1,0 +1,22 @@
+{
+  "name": "@daegu-courses/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@daegu-courses/api-schemas": "workspace:*",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@daegu-courses/tsconfig": "workspace:*",
+    "typescript": "^5.6.3"
+  }
+}

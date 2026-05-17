@@ -7,7 +7,7 @@ import { favorites } from "../../db/schema/users";
 import { courses } from "../../db/schema/courses";
 import { events } from "../../db/schema/events";
 import { institutions } from "../../db/schema/institutions";
-import { favoriteCreate, userIdHeader } from "../schemas";
+import { favoriteCreate, userIdHeader } from "@daegu-courses/api-schemas";
 import { zErr } from "../context";
 
 type Env = { Variables: { userId: string } };

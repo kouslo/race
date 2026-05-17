@@ -1,0 +1,4 @@
+{
+  "extends": "@daegu-courses/tsconfig/node.json",
+  "include": ["src/**/*.ts", "drizzle.config.ts"]
+}

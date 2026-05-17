@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 import { z } from "zod";
-import { userIdHeader } from "./schemas";
+import { userIdHeader } from "@daegu-courses/api-schemas";
 
 /** Resolve the calling user via X-User-Id header (UUID). */
 export function getUserId(c: Context): string {

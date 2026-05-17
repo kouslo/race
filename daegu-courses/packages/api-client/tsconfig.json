@@ -1,0 +1,8 @@
+{
+  "extends": "@daegu-courses/tsconfig/base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM"],
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts"]
+}

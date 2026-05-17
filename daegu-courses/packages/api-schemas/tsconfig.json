@@ -1,0 +1,7 @@
+{
+  "extends": "@daegu-courses/tsconfig/base.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts"]
+}

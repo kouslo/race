@@ -2,32 +2,26 @@
   "name": "daegu-courses",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
+  "packageManager": "pnpm@9.12.3",
   "scripts": {
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio",
-    "crawl": "tsx src/crawler/cli.ts",
-    "crawl:all": "tsx src/crawler/cli.ts --all",
-    "db:seed": "tsx src/db/seed.ts",
-    "api": "tsx src/api/server.ts",
-    "api:dev": "tsx watch src/api/server.ts"
-  },
-  "dependencies": {
-    "@hono/node-server": "^1.13.7",
-    "@hono/zod-validator": "^0.4.1",
-    "cheerio": "^1.0.0",
-    "drizzle-orm": "^0.36.0",
-    "hono": "^4.6.10",
-    "postgres": "^3.4.5",
-    "undici": "^6.21.0",
-    "zod": "^3.23.8"
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "api": "pnpm --filter @daegu-courses/api api",
+    "api:dev": "pnpm --filter @daegu-courses/api api:dev",
+    "crawl:all": "pnpm --filter @daegu-courses/api crawl:all",
+    "db:push": "pnpm --filter @daegu-courses/api db:push",
+    "db:seed": "pnpm --filter @daegu-courses/api db:seed",
+    "db:studio": "pnpm --filter @daegu-courses/api db:studio",
+    "web:dev": "pnpm --filter @daegu-courses/web dev",
+    "mobile:dev": "pnpm --filter @daegu-courses/mobile start"
   },
   "devDependencies": {
-    "@types/node": "^22.9.0",
-    "drizzle-kit": "^0.28.0",
-    "tsx": "^4.19.2",
+    "turbo": "^2.3.0",
     "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

@@ -3,7 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "../../db/client";
 import { institutions } from "../../db/schema/institutions";
-import { institutionsListQuery } from "../schemas";
+import { institutionsListQuery } from "@daegu-courses/api-schemas";
 import { zErr } from "../context";
 
 export const institutionsRoute = new Hono();

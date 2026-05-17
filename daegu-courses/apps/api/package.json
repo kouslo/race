@@ -1,0 +1,37 @@
+{
+  "name": "@daegu-courses/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "tsx src/db/seed.ts",
+    "crawl": "tsx src/crawler/cli.ts",
+    "crawl:all": "tsx src/crawler/cli.ts --all",
+    "api": "tsx src/server.ts",
+    "api:dev": "tsx watch src/server.ts",
+    "dev": "tsx watch src/server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@daegu-courses/api-schemas": "workspace:*",
+    "@hono/node-server": "^1.13.7",
+    "@hono/zod-validator": "^0.4.1",
+    "cheerio": "^1.0.0",
+    "drizzle-orm": "^0.36.0",
+    "hono": "^4.6.10",
+    "postgres": "^3.4.5",
+    "undici": "^6.21.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@daegu-courses/tsconfig": "workspace:*",
+    "@types/node": "^22.9.0",
+    "drizzle-kit": "^0.28.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}
