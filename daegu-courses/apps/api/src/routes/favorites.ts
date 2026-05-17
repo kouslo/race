@@ -2,25 +2,17 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import { db } from "../../db/client";
-import { favorites } from "../../db/schema/users";
-import { courses } from "../../db/schema/courses";
-import { events } from "../../db/schema/events";
-import { institutions } from "../../db/schema/institutions";
-import { favoriteCreate, userIdHeader } from "@daegu-courses/api-schemas";
+import { db } from "../db/client";
+import { favorites } from "../db/schema/users";
+import { courses } from "../db/schema/courses";
+import { events } from "../db/schema/events";
+import { institutions } from "../db/schema/institutions";
+import { favoriteCreate } from "@daegu-courses/api-schemas";
 import { zErr } from "../context";
+import { requireAuth, type AuthVars } from "../auth/middleware";
 
-type Env = { Variables: { userId: string } };
-export const favoritesRoute = new Hono<Env>();
-
-favoritesRoute.use("*", async (c, next) => {
-  const parsed = userIdHeader.safeParse(c.req.header("x-user-id"));
-  if (!parsed.success) {
-    return c.json({ error: "X-User-Id header is required (UUID)" }, 401);
-  }
-  c.set("userId", parsed.data);
-  await next();
-});
+export const favoritesRoute = new Hono<AuthVars>();
+favoritesRoute.use("*", requireAuth);
 
 favoritesRoute.get("/", async (c) => {
   const userId = c.var.userId;

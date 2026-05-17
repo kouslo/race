@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { and, asc, eq } from "drizzle-orm";
-import { db } from "../../db/client";
-import { institutions } from "../../db/schema/institutions";
+import { db } from "../db/client";
+import { institutions } from "../db/schema/institutions";
 import { institutionsListQuery } from "@daegu-courses/api-schemas";
 import { zErr } from "../context";
 

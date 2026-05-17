@@ -2,6 +2,7 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
+import { authRoute } from "./routes/auth";
 import { coursesRoute } from "./routes/courses";
 import { eventsRoute } from "./routes/events";
 import { institutionsRoute } from "./routes/institutions";
@@ -22,6 +23,7 @@ app.use(
 
 app.get("/healthz", (c) => c.json({ ok: true }));
 
+app.route("/api/v1/auth", authRoute);
 app.route("/api/v1/courses", coursesRoute);
 app.route("/api/v1/events", eventsRoute);
 app.route("/api/v1/institutions", institutionsRoute);

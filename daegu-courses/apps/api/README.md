@@ -52,7 +52,15 @@ Response:
 
 ## Auth
 
-Favourites use an `X-User-Id: <uuid>` header. Replace with real auth
-(Kakao/Naver/Apple OIDC → session/JWT) before going to production.
-The handlers only need `c.var.userId` set by middleware, so swapping in
-a real auth provider is local to `routes/favorites.ts`.
+Kakao OIDC → 우리 access JWT (HS256, 15분) + opaque refresh token
+(30일, DB에 SHA-256 해시로 저장). 자세한 흐름은 `src/auth/README.md`.
+
+```
+POST /api/v1/auth/kakao/callback   { code, redirectUri }
+POST /api/v1/auth/refresh          { refreshToken }
+POST /api/v1/auth/logout           { refreshToken }
+GET  /api/v1/auth/me               Authorization: Bearer <jwt>
+```
+
+보호된 엔드포인트(`/favorites/*`)는 `Authorization: Bearer <jwt>` 필수.
+미들웨어가 검증 후 `c.var.userId`를 주입합니다.

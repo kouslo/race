@@ -19,7 +19,7 @@ export const users = pgTable(
   "users",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    email: varchar("email", { length: 320 }).unique(),
+    email: varchar("email", { length: 320 }),
     nickname: varchar("nickname", { length: 50 }).notNull(),
     profileUrl: text("profile_url"),
     provider: authProviderEnum("provider").notNull(),

@@ -83,3 +83,39 @@ export type ListResponse<T> = {
   total: number;
   hasMore: boolean;
 };
+
+/* ─────────── auth ─────────── */
+
+export const authProviderValues = ["kakao", "naver", "apple", "google"] as const;
+
+export const kakaoCallbackInput = z.object({
+  code: z.string().min(1),
+  redirectUri: z.string().url(),
+  codeVerifier: z.string().min(1).optional(),
+});
+export type KakaoCallbackInput = z.infer<typeof kakaoCallbackInput>;
+
+export const refreshInput = z.object({
+  refreshToken: z.string().min(1),
+});
+export type RefreshInput = z.infer<typeof refreshInput>;
+
+export const authUser = z.object({
+  id: z.string().uuid(),
+  email: z.string().nullable(),
+  nickname: z.string(),
+  profileUrl: z.string().nullable(),
+  provider: z.enum(authProviderValues),
+});
+export type AuthUser = z.infer<typeof authUser>;
+
+export const authSession = z.object({
+  accessToken: z.string(),
+  refreshToken: z.string(),
+  accessTokenExpiresAt: z.string(),
+  user: authUser,
+});
+export type AuthSession = z.infer<typeof authSession>;
+
+export const refreshOutput = authSession.omit({ user: true });
+export type RefreshOutput = z.infer<typeof refreshOutput>;

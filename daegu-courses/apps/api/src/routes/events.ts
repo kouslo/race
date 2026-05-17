@@ -2,9 +2,9 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { and, asc, count, desc, eq, gte, ilike, lte, or } from "drizzle-orm";
 import { z } from "zod";
-import { db } from "../../db/client";
-import { events } from "../../db/schema/events";
-import { institutions } from "../../db/schema/institutions";
+import { db } from "../db/client";
+import { events } from "../db/schema/events";
+import { institutions } from "../db/schema/institutions";
 import { eventsListQuery, type ListResponse } from "@daegu-courses/api-schemas";
 import { zErr } from "../context";
 

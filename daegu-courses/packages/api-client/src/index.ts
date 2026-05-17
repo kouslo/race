@@ -1,13 +1,17 @@
 import type {
+  AuthSession,
+  AuthUser,
   CoursesListQuery,
   EventsListQuery,
+  KakaoCallbackInput,
   ListResponse,
+  RefreshOutput,
 } from "@daegu-courses/api-schemas";
 
 export type ClientOptions = {
   baseUrl: string;
-  /** Bearer token or user id forwarded as X-User-Id (favorites). */
-  userId?: string;
+  /** Static bearer token, or a getter to read it lazily (e.g. cookies). */
+  accessToken?: string | (() => string | undefined | Promise<string | undefined>);
   fetch?: typeof fetch;
 };
 
@@ -59,6 +63,13 @@ export function createClient(opts: ClientOptions) {
   const f = opts.fetch ?? fetch;
   const base = opts.baseUrl.replace(/\/$/, "");
 
+  async function resolveToken(): Promise<string | undefined> {
+    if (!opts.accessToken) return undefined;
+    return typeof opts.accessToken === "function"
+      ? await opts.accessToken()
+      : opts.accessToken;
+  }
+
   async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
     const headers: Record<string, string> = {
       Accept: "application/json",
@@ -67,7 +78,8 @@ export function createClient(opts: ClientOptions) {
     if (init.body && !headers["Content-Type"]) {
       headers["Content-Type"] = "application/json";
     }
-    if (opts.userId) headers["X-User-Id"] = opts.userId;
+    const token = await resolveToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
 
     const res = await f(`${base}${path}`, { ...init, headers });
     if (!res.ok) {
@@ -88,6 +100,24 @@ export function createClient(opts: ClientOptions) {
   }
 
   return {
+    auth: {
+      kakaoCallback: (body: KakaoCallbackInput) =>
+        call<AuthSession>(`/api/v1/auth/kakao/callback`, {
+          method: "POST",
+          body: JSON.stringify(body),
+        }),
+      refresh: (refreshToken: string) =>
+        call<RefreshOutput>(`/api/v1/auth/refresh`, {
+          method: "POST",
+          body: JSON.stringify({ refreshToken }),
+        }),
+      logout: (refreshToken: string) =>
+        call<{ ok: true }>(`/api/v1/auth/logout`, {
+          method: "POST",
+          body: JSON.stringify({ refreshToken }),
+        }),
+      me: () => call<AuthUser>(`/api/v1/auth/me`),
+    },
     courses: {
       list: (q: Partial<CoursesListQuery> = {}) =>
         call<ListResponse<CourseListItem>>(`/api/v1/courses${toQuery(q)}`),
