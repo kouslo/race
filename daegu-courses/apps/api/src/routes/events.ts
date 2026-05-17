@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { and, asc, count, desc, eq, gte, ilike, lte, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, ilike, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/client";
 import { events } from "../db/schema/events";
@@ -31,7 +31,12 @@ eventsRoute.get(
     if (q.district) filters.push(eq(institutions.district, q.district));
 
     const where = filters.length ? and(...filters) : undefined;
-    const orderBy = q.sort === "recent" ? desc(events.updatedAt) : asc(events.eventStartAt);
+    const orderBy =
+      q.sort === "recent"
+        ? desc(events.updatedAt)
+        : q.sort === "relevance" && q.q
+          ? sql`greatest(similarity(${events.title}, ${q.q}), similarity(coalesce(${events.description}, ''), ${q.q})) desc`
+          : asc(events.eventStartAt);
     const offset = (q.page - 1) * q.pageSize;
 
     const [rows, [{ total }]] = await Promise.all([

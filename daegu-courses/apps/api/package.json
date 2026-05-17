@@ -8,6 +8,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
+    "db:init": "tsx src/db/init.ts",
+    "db:setup": "pnpm db:init && pnpm db:push",
     "db:seed": "tsx src/db/seed.ts",
     "crawl": "tsx src/crawler/cli.ts",
     "crawl:all": "tsx src/crawler/cli.ts --all",

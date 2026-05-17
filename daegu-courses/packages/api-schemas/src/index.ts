@@ -47,7 +47,7 @@ export const coursesListQuery = paginationQuery.extend({
   status: z.enum(courseStatusValues).optional(),
   free: z.coerce.boolean().optional(),
   applyOpen: z.coerce.boolean().optional(),
-  sort: z.enum(["recent", "applyEndSoon", "startDate"]).default("recent"),
+  sort: z.enum(["recent", "applyEndSoon", "startDate", "relevance"]).default("recent"),
 });
 export type CoursesListQuery = z.infer<typeof coursesListQuery>;
 
@@ -58,7 +58,7 @@ export const eventsListQuery = paginationQuery.extend({
   institutionId: z.string().uuid().optional(),
   from: z.coerce.date().optional(),
   to: z.coerce.date().optional(),
-  sort: z.enum(["startSoon", "recent"]).default("startSoon"),
+  sort: z.enum(["startSoon", "recent", "relevance"]).default("startSoon"),
 });
 export type EventsListQuery = z.infer<typeof eventsListQuery>;
 

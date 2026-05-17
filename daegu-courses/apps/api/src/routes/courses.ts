@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { and, asc, count, desc, eq, gt, ilike, lte, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, ilike, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/client";
 import { courses } from "../db/schema/courses";
@@ -42,7 +42,9 @@ coursesRoute.get(
         ? asc(courses.applyEndAt)
         : q.sort === "startDate"
           ? asc(courses.startDate)
-          : desc(courses.updatedAt);
+          : q.sort === "relevance" && q.q
+            ? sql`greatest(similarity(${courses.title}, ${q.q}), similarity(coalesce(${courses.description}, ''), ${q.q})) desc`
+            : desc(courses.updatedAt);
 
     const offset = (q.page - 1) * q.pageSize;
 

@@ -60,5 +60,11 @@ export const events = pgTable(
     index("events_status_start_idx").on(t.status, t.eventStartAt),
     index("events_category_idx").on(t.category),
     index("events_start_idx").on(t.eventStartAt),
+    // Trigram GIN indexes — requires pg_trgm.
+    index("events_title_trgm_idx").using("gin", sql`${t.title} gin_trgm_ops`),
+    index("events_description_trgm_idx").using(
+      "gin",
+      sql`coalesce(${t.description}, '') gin_trgm_ops`,
+    ),
   ],
 );

@@ -21,7 +21,8 @@ export default async function CoursesPage({ searchParams }: { searchParams: Sear
   const district = typeof sp.district === "string" ? (sp.district as CoursesListQuery["district"]) : undefined;
   const status = typeof sp.status === "string" ? (sp.status as CoursesListQuery["status"]) : "open";
 
-  const res = await api.courses.list({ q, district, status, pageSize: 20, sort: "applyEndSoon" });
+  const sort: CoursesListQuery["sort"] = q ? "relevance" : "applyEndSoon";
+  const res = await api.courses.list({ q, district, status, pageSize: 20, sort });
 
   return (
     <main style={{ maxWidth: 1024, margin: "0 auto", padding: "32px 24px" }}>

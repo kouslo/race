@@ -25,7 +25,7 @@ pnpm install
 
 # 1) DB 준비
 cp apps/api/.env.example apps/api/.env   # DATABASE_URL 등 설정
-pnpm db:push                              # 스키마 적용
+pnpm db:setup                             # pg_trgm 확장 + 스키마 적용
 pnpm db:seed                              # 도서관 3곳 + crawl_sources 등록
 pnpm crawl:all                            # 첫 크롤링
 

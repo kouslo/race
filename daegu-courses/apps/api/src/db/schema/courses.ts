@@ -79,5 +79,12 @@ export const courses = pgTable(
     index("courses_category_idx").on(t.category),
     index("courses_start_date_idx").on(t.startDate),
     index("courses_institution_idx").on(t.institutionId),
+    // Trigram GIN indexes for fast Korean ILIKE / similarity search.
+    // Requires the pg_trgm extension (see apps/api/src/db/init.ts).
+    index("courses_title_trgm_idx").using("gin", sql`${t.title} gin_trgm_ops`),
+    index("courses_description_trgm_idx").using(
+      "gin",
+      sql`coalesce(${t.description}, '') gin_trgm_ops`,
+    ),
   ],
 );
