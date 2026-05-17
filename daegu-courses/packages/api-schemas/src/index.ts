@@ -119,3 +119,39 @@ export type AuthSession = z.infer<typeof authSession>;
 
 export const refreshOutput = authSession.omit({ user: true });
 export type RefreshOutput = z.infer<typeof refreshOutput>;
+
+/* ─────────── push notifications ─────────── */
+
+export const pushPlatformValues = ["ios", "android", "web"] as const;
+export const notificationKindValues = [
+  "apply_open",
+  "apply_closing",
+  "new_in_category",
+] as const;
+
+export const pushTokenRegister = z.object({
+  token: z.string().min(1),
+  platform: z.enum(pushPlatformValues),
+  deviceId: z.string().max(200).optional(),
+});
+export type PushTokenRegister = z.infer<typeof pushTokenRegister>;
+
+export const subscriptionCreate = z
+  .object({
+    type: z.enum(notificationKindValues),
+    category: z.enum(courseCategoryValues).optional(),
+    targetType: z.enum(favoriteTargetValues).optional(),
+    targetId: z.string().uuid().optional(),
+  })
+  .refine(
+    (v) =>
+      v.type !== "new_in_category" || (v.category !== undefined && v.targetId === undefined),
+    { message: "new_in_category requires `category` (and no targetId)" },
+  )
+  .refine(
+    (v) =>
+      v.type === "new_in_category" ||
+      (v.targetType !== undefined && v.targetId !== undefined),
+    { message: "apply_open/apply_closing requires targetType + targetId" },
+  );
+export type SubscriptionCreate = z.infer<typeof subscriptionCreate>;

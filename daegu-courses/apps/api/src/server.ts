@@ -7,6 +7,8 @@ import { coursesRoute } from "./routes/courses";
 import { eventsRoute } from "./routes/events";
 import { institutionsRoute } from "./routes/institutions";
 import { favoritesRoute } from "./routes/favorites";
+import { pushRoute } from "./routes/push";
+import { notificationsRoute } from "./routes/notifications";
 
 const app = new Hono();
 
@@ -28,6 +30,8 @@ app.route("/api/v1/courses", coursesRoute);
 app.route("/api/v1/events", eventsRoute);
 app.route("/api/v1/institutions", institutionsRoute);
 app.route("/api/v1/favorites", favoritesRoute);
+app.route("/api/v1/push", pushRoute);
+app.route("/api/v1/notifications", notificationsRoute);
 
 app.notFound((c) => c.json({ error: "not_found" }, 404));
 app.onError((err, c) => {

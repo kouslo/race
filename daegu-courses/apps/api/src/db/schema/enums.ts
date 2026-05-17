@@ -65,3 +65,12 @@ export const notificationTypeEnum = pgEnum("notification_type", [
 ]);
 
 export const crawlStatusEnum = pgEnum("crawl_status", ["success", "partial", "failed"]);
+
+export const pushPlatformEnum = pgEnum("push_platform", ["ios", "android", "web"]);
+
+export const notificationChannelEnum = pgEnum("notification_channel", [
+  "expo",
+  "apns",
+  "fcm",
+  "webpush",
+]);

@@ -5,7 +5,9 @@ import type {
   EventsListQuery,
   KakaoCallbackInput,
   ListResponse,
+  PushTokenRegister,
   RefreshOutput,
+  SubscriptionCreate,
 } from "@daegu-courses/api-schemas";
 
 export type ClientOptions = {
@@ -144,6 +146,32 @@ export function createClient(opts: ClientOptions) {
         call(`/api/v1/favorites`, { method: "POST", body: JSON.stringify(body) }),
       remove: (id: string) =>
         call(`/api/v1/favorites/${id}`, { method: "DELETE" }),
+    },
+    push: {
+      register: (body: PushTokenRegister) =>
+        call<{ id: string }>(`/api/v1/push/tokens`, {
+          method: "POST",
+          body: JSON.stringify(body),
+        }),
+      unregister: (id: string) =>
+        call<{ ok: true }>(`/api/v1/push/tokens/${id}`, { method: "DELETE" }),
+    },
+    notifications: {
+      subscribe: (body: SubscriptionCreate) =>
+        call<{ id: string }>(`/api/v1/notifications/subscriptions`, {
+          method: "POST",
+          body: JSON.stringify(body),
+        }),
+      unsubscribe: (id: string) =>
+        call<{ ok: true }>(`/api/v1/notifications/subscriptions/${id}`, { method: "DELETE" }),
+      listSubscriptions: () =>
+        call<{ items: Array<{ id: string; type: string; category: string | null; targetId: string | null }> }>(
+          `/api/v1/notifications/subscriptions`,
+        ),
+      deliveries: () =>
+        call<{ items: Array<{ id: string; kind: string; targetId: string; sentAt: string }> }>(
+          `/api/v1/notifications/deliveries`,
+        ),
     },
   };
 }

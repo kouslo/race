@@ -11,6 +11,7 @@
     "api": "pnpm --filter @daegu-courses/api api",
     "api:dev": "pnpm --filter @daegu-courses/api api:dev",
     "crawl:all": "pnpm --filter @daegu-courses/api crawl:all",
+    "notify:dispatch": "pnpm --filter @daegu-courses/api notify:dispatch",
     "db:push": "pnpm --filter @daegu-courses/api db:push",
     "db:seed": "pnpm --filter @daegu-courses/api db:seed",
     "db:studio": "pnpm --filter @daegu-courses/api db:studio",
