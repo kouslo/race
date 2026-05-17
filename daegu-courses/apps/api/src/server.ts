@@ -2,6 +2,7 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
+import { adminRoute } from "./routes/admin";
 import { authRoute } from "./routes/auth";
 import { coursesRoute } from "./routes/courses";
 import { eventsRoute } from "./routes/events";
@@ -32,6 +33,7 @@ app.route("/api/v1/institutions", institutionsRoute);
 app.route("/api/v1/favorites", favoritesRoute);
 app.route("/api/v1/push", pushRoute);
 app.route("/api/v1/notifications", notificationsRoute);
+app.route("/api/v1/admin", adminRoute);
 
 app.notFound((c) => c.json({ error: "not_found" }, 404));
 app.onError((err, c) => {

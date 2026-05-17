@@ -12,6 +12,8 @@
     "crawl": "tsx src/crawler/cli.ts",
     "crawl:all": "tsx src/crawler/cli.ts --all",
     "notify:dispatch": "tsx src/notify/cli.ts",
+    "admin:grant": "tsx src/cli/admin.ts grant",
+    "admin:revoke": "tsx src/cli/admin.ts revoke",
     "api": "tsx src/server.ts",
     "api:dev": "tsx watch src/server.ts",
     "dev": "tsx watch src/server.ts",

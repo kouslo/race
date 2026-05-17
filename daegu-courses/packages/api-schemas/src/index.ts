@@ -155,3 +155,49 @@ export const subscriptionCreate = z
     { message: "apply_open/apply_closing requires targetType + targetId" },
   );
 export type SubscriptionCreate = z.infer<typeof subscriptionCreate>;
+
+/* ─────────── admin ─────────── */
+
+export const institutionTypeValues = [
+  "culture_center",
+  "library",
+  "community",
+  "museum",
+  "school",
+  "private",
+  "etc",
+] as const;
+
+export const contentTypeValues = ["course", "event", "both"] as const;
+
+export const institutionCreate = z.object({
+  name: z.string().min(1).max(200),
+  slug: z
+    .string()
+    .min(1)
+    .max(200)
+    .regex(/^[a-z0-9-]+$/, "slug must be kebab-case [a-z0-9-]"),
+  type: z.enum(institutionTypeValues),
+  district: z.enum(districtValues),
+  address: z.string().max(500).optional(),
+  lat: z.coerce.number().min(-90).max(90).optional(),
+  lng: z.coerce.number().min(-180).max(180).optional(),
+  phone: z.string().max(30).optional(),
+  homepageUrl: z.string().url(),
+  logoUrl: z.string().url().optional(),
+});
+export type InstitutionCreate = z.infer<typeof institutionCreate>;
+export const institutionUpdate = institutionCreate.partial();
+export type InstitutionUpdate = z.infer<typeof institutionUpdate>;
+
+export const crawlSourceCreate = z.object({
+  institutionId: z.string().uuid(),
+  sourceUrl: z.string().url(),
+  adapterKey: z.string().min(1).max(100),
+  contentType: z.enum(contentTypeValues).default("course"),
+  crawlIntervalMinutes: z.coerce.number().int().min(5).max(60 * 24 * 7).default(1440),
+  isActive: z.boolean().default(true),
+});
+export type CrawlSourceCreate = z.infer<typeof crawlSourceCreate>;
+export const crawlSourceUpdate = crawlSourceCreate.partial().omit({ institutionId: true });
+export type CrawlSourceUpdate = z.infer<typeof crawlSourceUpdate>;

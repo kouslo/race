@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   pgTable,
   uuid,
   varchar,
@@ -25,6 +26,7 @@ export const users = pgTable(
     provider: authProviderEnum("provider").notNull(),
     providerUserId: varchar("provider_user_id", { length: 200 }).notNull(),
     pushToken: text("push_token"),
+    isAdmin: boolean("is_admin").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()

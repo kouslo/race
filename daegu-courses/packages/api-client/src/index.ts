@@ -2,7 +2,11 @@ import type {
   AuthSession,
   AuthUser,
   CoursesListQuery,
+  CrawlSourceCreate,
+  CrawlSourceUpdate,
   EventsListQuery,
+  InstitutionCreate,
+  InstitutionUpdate,
   KakaoCallbackInput,
   ListResponse,
   PushTokenRegister,
@@ -173,8 +177,93 @@ export function createClient(opts: ClientOptions) {
           `/api/v1/notifications/deliveries`,
         ),
     },
+    admin: {
+      stats: () =>
+        call<{
+          institutions: number;
+          crawlSources: number;
+          courses: number;
+          events: number;
+        }>(`/api/v1/admin/stats`),
+      institutions: {
+        list: () => call<{ items: Institution[] }>(`/api/v1/admin/institutions`),
+        create: (body: InstitutionCreate) =>
+          call<Institution>(`/api/v1/admin/institutions`, {
+            method: "POST",
+            body: JSON.stringify(body),
+          }),
+        update: (id: string, body: InstitutionUpdate) =>
+          call<Institution>(`/api/v1/admin/institutions/${id}`, {
+            method: "PATCH",
+            body: JSON.stringify(body),
+          }),
+        remove: (id: string) =>
+          call<{ ok: true }>(`/api/v1/admin/institutions/${id}`, { method: "DELETE" }),
+      },
+      adapters: () =>
+        call<{ items: Array<{ key: string; name: string; contentType: string }> }>(
+          `/api/v1/admin/adapters`,
+        ),
+      sources: {
+        list: (institutionId?: string) =>
+          call<{ items: AdminCrawlSourceRow[] }>(
+            `/api/v1/admin/crawl-sources${toQuery({ institutionId })}`,
+          ),
+        create: (body: CrawlSourceCreate) =>
+          call<AdminCrawlSource>(`/api/v1/admin/crawl-sources`, {
+            method: "POST",
+            body: JSON.stringify(body),
+          }),
+        update: (id: string, body: CrawlSourceUpdate) =>
+          call<AdminCrawlSource>(`/api/v1/admin/crawl-sources/${id}`, {
+            method: "PATCH",
+            body: JSON.stringify(body),
+          }),
+        remove: (id: string) =>
+          call<{ ok: true }>(`/api/v1/admin/crawl-sources/${id}`, { method: "DELETE" }),
+        runNow: (id: string) =>
+          call<{ ok: true; stats: { found: number; created: number; updated: number; deactivated: number } }>(
+            `/api/v1/admin/crawl-sources/${id}/crawl`,
+            { method: "POST" },
+          ),
+      },
+      crawlLogs: (params: { sourceId?: string; limit?: number } = {}) =>
+        call<{ items: AdminCrawlLog[] }>(`/api/v1/admin/crawl-logs${toQuery(params)}`),
+    },
   };
 }
+
+export type AdminCrawlSource = {
+  id: string;
+  institutionId: string;
+  sourceUrl: string;
+  adapterKey: string;
+  contentType: string;
+  isActive: boolean;
+  crawlIntervalMinutes: number;
+  lastCrawledAt: string | null;
+  lastSuccessAt: string | null;
+  lastErrorMessage: string | null;
+  consecutiveFailures: number;
+  createdAt: string;
+  updatedAt: string;
+};
+export type AdminCrawlSourceRow = {
+  source: AdminCrawlSource;
+  institution: { id: string; name: string; district: string };
+};
+export type AdminCrawlLog = {
+  id: string;
+  sourceId: string;
+  startedAt: string;
+  finishedAt: string | null;
+  status: "success" | "partial" | "failed";
+  itemsFound: number;
+  itemsCreated: number;
+  itemsUpdated: number;
+  itemsDeactivated: number;
+  errorMessage: string | null;
+};
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
