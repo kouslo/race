@@ -5,8 +5,12 @@ const baseUrl =
   (Constants.expoConfig?.extra as { apiBaseUrl?: string } | undefined)?.apiBaseUrl ??
   "http://localhost:3000";
 
-export const api = createClient({ baseUrl });
+/**
+ * Anonymous client for public endpoints (course listings, etc.) in places
+ * where the auth context isn't easily reachable. For authenticated calls
+ * prefer `useAuth().api`, which transparently attaches the access token
+ * and refreshes when expired.
+ */
+export const publicApi = createClient({ baseUrl });
 
-export function userApi(userId: string) {
-  return createClient({ baseUrl, userId });
-}
+export { baseUrl };

@@ -25,7 +25,8 @@
       "typedRoutes": true
     },
     "extra": {
-      "apiBaseUrl": "http://localhost:3000"
+      "apiBaseUrl": "http://localhost:3000",
+      "kakaoClientId": ""
     },
     "ios": {
       "supportsTablet": true,
