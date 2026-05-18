@@ -19,17 +19,22 @@ export default async function HomePage() {
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32 }}>
         <h1 style={{ fontSize: 28, margin: 0 }}>대구 강좌·문화행사</h1>
         {me ? (
-          <form action="/logout" method="POST">
-            <span style={{ color: "#666", marginRight: 12, fontSize: 13 }}>
-              {me.nickname}님
-            </span>
-            <button
-              type="submit"
-              style={{ padding: "6px 12px", border: "1px solid #ccc", borderRadius: 6, background: "transparent", cursor: "pointer" }}
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Link
+              href="/me"
+              style={{ padding: "6px 12px", border: "1px solid #ccc", borderRadius: 6, textDecoration: "none", fontSize: 13 }}
             >
-              로그아웃
-            </button>
-          </form>
+              {me.nickname}님
+            </Link>
+            <form action="/logout" method="POST">
+              <button
+                type="submit"
+                style={{ padding: "6px 12px", border: "1px solid #ccc", borderRadius: 6, background: "transparent", cursor: "pointer", fontSize: 13 }}
+              >
+                로그아웃
+              </button>
+            </form>
+          </div>
         ) : (
           <Link href="/login" style={{ padding: "6px 12px", border: "1px solid #ccc", borderRadius: 6, textDecoration: "none" }}>
             로그인

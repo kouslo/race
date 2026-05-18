@@ -145,9 +145,15 @@ export function createClient(opts: ClientOptions) {
         call<{ items: Institution[] }>(`/api/v1/institutions${toQuery(q)}`),
     },
     favorites: {
-      list: () => call<{ courses: unknown[]; events: unknown[] }>(`/api/v1/favorites`),
+      list: () =>
+        call<{ courses: FavoriteCourseEntry[]; events: FavoriteEventEntry[] }>(
+          `/api/v1/favorites`,
+        ),
       add: (body: { targetType: "course" | "event"; targetId: string }) =>
-        call(`/api/v1/favorites`, { method: "POST", body: JSON.stringify(body) }),
+        call<{ id?: string; ok?: boolean }>(`/api/v1/favorites`, {
+          method: "POST",
+          body: JSON.stringify(body),
+        }),
       remove: (id: string) =>
         call(`/api/v1/favorites/${id}`, { method: "DELETE" }),
     },
@@ -252,6 +258,32 @@ export type AdminCrawlSourceRow = {
   source: AdminCrawlSource;
   institution: { id: string; name: string; district: string };
 };
+export type FavoriteCourseEntry = {
+  id: string;
+  createdAt: string;
+  target: {
+    id: string;
+    title: string;
+    status: string;
+    startDate: string | null;
+    applyEndAt: string | null;
+    applyUrl: string;
+    institution: { id: string; name: string };
+  };
+};
+export type FavoriteEventEntry = {
+  id: string;
+  createdAt: string;
+  target: {
+    id: string;
+    title: string;
+    eventStartAt: string;
+    location: string;
+    reserveUrl: string | null;
+    institution: { id: string; name: string };
+  };
+};
+
 export type AdminCrawlLog = {
   id: string;
   sourceId: string;

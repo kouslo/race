@@ -1,4 +1,6 @@
 import { api } from "@/lib/api";
+import { getAccessToken } from "@/lib/auth";
+import { FavoriteButton } from "@/components/FavoriteButton";
 import type { CoursesListQuery } from "@daegu-courses/api-schemas";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -22,7 +24,14 @@ export default async function CoursesPage({ searchParams }: { searchParams: Sear
   const status = typeof sp.status === "string" ? (sp.status as CoursesListQuery["status"]) : "open";
 
   const sort: CoursesListQuery["sort"] = q ? "relevance" : "applyEndSoon";
-  const res = await api.courses.list({ q, district, status, pageSize: 20, sort });
+  const [res, favoritedIds] = await Promise.all([
+    api.courses.list({ q, district, status, pageSize: 20, sort }),
+    loadFavoritedCourseIds(),
+  ]);
+
+  const nextPath = `/courses?${new URLSearchParams(
+    Object.fromEntries(Object.entries({ q, district, status }).filter(([, v]) => v)) as Record<string, string>,
+  ).toString()}`;
 
   return (
     <main style={{ maxWidth: 1024, margin: "0 auto", padding: "32px 24px" }}>
@@ -67,11 +76,19 @@ export default async function CoursesPage({ searchParams }: { searchParams: Sear
               background: "var(--card, #fff)",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-              <a href={c.applyUrl} target="_blank" rel="noreferrer" style={{ fontWeight: 600, fontSize: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+              <a href={c.applyUrl} target="_blank" rel="noreferrer" style={{ fontWeight: 600, fontSize: 16, flex: 1 }}>
                 {c.title}
               </a>
-              <StatusBadge status={c.status} />
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                <FavoriteButton
+                  targetType="course"
+                  targetId={c.id}
+                  isFavorited={favoritedIds.has(c.id)}
+                  nextPath={nextPath}
+                />
+                <StatusBadge status={c.status} />
+              </div>
             </div>
             <div style={{ color: "#666", fontSize: 13, marginTop: 6 }}>
               {c.institution.name} · {c.institution.district}
@@ -92,6 +109,17 @@ export default async function CoursesPage({ searchParams }: { searchParams: Sear
       )}
     </main>
   );
+}
+
+async function loadFavoritedCourseIds(): Promise<Set<string>> {
+  const token = await getAccessToken();
+  if (!token) return new Set();
+  try {
+    const favs = await api.favorites.list();
+    return new Set(favs.courses.map((f) => f.target.id));
+  } catch {
+    return new Set();
+  }
 }
 
 function StatusBadge({ status }: { status: string }) {
