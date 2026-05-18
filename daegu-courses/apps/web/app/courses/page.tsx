@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { api } from "@/lib/api";
 import { getAccessToken } from "@/lib/auth";
 import { FavoriteButton } from "@/components/FavoriteButton";
@@ -77,9 +78,12 @@ export default async function CoursesPage({ searchParams }: { searchParams: Sear
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
-              <a href={c.applyUrl} target="_blank" rel="noreferrer" style={{ fontWeight: 600, fontSize: 16, flex: 1 }}>
+              <Link
+                href={`/courses/${c.id}`}
+                style={{ fontWeight: 600, fontSize: 16, flex: 1, textDecoration: "none", color: "inherit" }}
+              >
                 {c.title}
-              </a>
+              </Link>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
                 <FavoriteButton
                   targetType="course"

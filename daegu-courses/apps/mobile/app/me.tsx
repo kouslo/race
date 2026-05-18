@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { router } from "expo-router";
+import { Link, router } from "expo-router";
 import { useAuth } from "@/lib/auth-context";
 import type { FavoriteCourseEntry, FavoriteEventEntry } from "@daegu-courses/api-client";
 
@@ -46,15 +46,22 @@ export default function Me() {
           <Text style={styles.nickname}>{state.user.nickname}</Text>
           <Text style={styles.email}>{state.user.email ?? state.user.provider}</Text>
         </View>
-        <Pressable
-          onPress={async () => {
-            await signOut();
-            router.replace("/");
-          }}
-          style={styles.signOutBtn}
-        >
-          <Text style={styles.signOutText}>로그아웃</Text>
-        </Pressable>
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <Link href="/notifications" asChild>
+            <Pressable style={styles.signOutBtn}>
+              <Text style={styles.signOutText}>🔔 알림</Text>
+            </Pressable>
+          </Link>
+          <Pressable
+            onPress={async () => {
+              await signOut();
+              router.replace("/");
+            }}
+            style={styles.signOutBtn}
+          >
+            <Text style={styles.signOutText}>로그아웃</Text>
+          </Pressable>
+        </View>
       </View>
 
       {err && <Text style={styles.error}>{err}</Text>}

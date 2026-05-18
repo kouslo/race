@@ -30,14 +30,22 @@ export default async function MePage() {
           <h1 style={{ fontSize: 24, margin: 0 }}>{me.nickname}</h1>
           <div style={{ color: "#666", fontSize: 13, marginTop: 4 }}>{me.email ?? me.provider}</div>
         </div>
-        <form action="/logout" method="POST">
-          <button
-            type="submit"
-            style={{ padding: "6px 12px", border: "1px solid #ccc", borderRadius: 6, background: "transparent", cursor: "pointer" }}
+        <div style={{ display: "flex", gap: 8 }}>
+          <Link
+            href="/me/notifications"
+            style={{ padding: "6px 12px", border: "1px solid #ccc", borderRadius: 6, textDecoration: "none", fontSize: 13 }}
           >
-            로그아웃
-          </button>
-        </form>
+            🔔 알림 설정
+          </Link>
+          <form action="/logout" method="POST">
+            <button
+              type="submit"
+              style={{ padding: "6px 12px", border: "1px solid #ccc", borderRadius: 6, background: "transparent", cursor: "pointer", fontSize: 13 }}
+            >
+              로그아웃
+            </button>
+          </form>
+        </div>
       </header>
 
       <section style={{ marginBottom: 32 }}>

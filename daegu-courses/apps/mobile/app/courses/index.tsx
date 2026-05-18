@@ -91,7 +91,7 @@ export default function Courses() {
           <View style={styles.row}>
             <Pressable
               style={{ flex: 1 }}
-              onPress={() => Linking.openURL(item.applyUrl)}
+              onPress={() => router.push(`/courses/${item.id}`)}
             >
               <Text style={styles.title} numberOfLines={2}>
                 {item.title}
