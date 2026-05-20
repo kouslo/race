@@ -6,6 +6,7 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
+    "preview": "bash scripts/preview.sh",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "api": "pnpm --filter @daegu-courses/api api",

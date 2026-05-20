@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: daegu-courses-db
+    environment:
+      POSTGRES_DB: daegu_courses
+      POSTGRES_USER: daegu
+      POSTGRES_PASSWORD: daegu
+    ports:
+      - "5432:5432"
+    volumes:
+      - dc_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U daegu -d daegu_courses"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  dc_pgdata:

@@ -18,6 +18,18 @@ packages/
 
 ## 빠른 시작
 
+### 한 줄 미리보기 (Docker 있는 경우)
+
+```bash
+pnpm preview
+# Postgres 컨테이너 + DB 시드 + API + Web 동시 실행
+# http://localhost:3001 접속
+```
+
+자세한 가이드: [PREVIEW.md](./PREVIEW.md)
+
+### 수동 설정
+
 ```bash
 # 사전: pnpm, Node 20+, PostgreSQL
 npm install -g pnpm
