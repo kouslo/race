@@ -133,6 +133,10 @@ export function createClient(opts: ClientOptions) {
         ),
       similar: (id: string) =>
         call<{ items: CourseListItem[] }>(`/api/v1/courses/${id}/similar`),
+      suggest: (q: string, limit = 8) =>
+        call<{ items: CourseSuggestion[] }>(
+          `/api/v1/courses/suggest${toQuery({ q, limit })}`,
+        ),
     },
     events: {
       list: (q: Partial<EventsListQuery> = {}) =>
@@ -240,6 +244,14 @@ export function createClient(opts: ClientOptions) {
     },
   };
 }
+
+export type CourseSuggestion = {
+  id: string;
+  title: string;
+  status: string;
+  fee: number;
+  institution: { name: string; district: string };
+};
 
 export type AdminCrawlSource = {
   id: string;

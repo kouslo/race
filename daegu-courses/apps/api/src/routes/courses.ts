@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { and, asc, count, desc, eq, gt, ilike, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, ilike, inArray, lte, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/client";
 import { courses } from "../db/schema/courses";
@@ -93,6 +93,56 @@ coursesRoute.get(
       hasMore: offset + rows.length < total,
     };
     return c.json(body);
+  },
+);
+
+/**
+ * Lightweight autocomplete endpoint for the search box.
+ * Uses pg_trgm `similarity()` for ranking (see SEARCH.md), backed by
+ * the GIN index on `courses.title`. Returns at most 8 currently open
+ * or upcoming courses.
+ */
+const suggestQuery = z.object({
+  q: z.string().trim().min(1).max(100),
+  limit: z.coerce.number().int().min(1).max(20).default(8),
+});
+
+coursesRoute.get(
+  "/suggest",
+  zValidator("query", suggestQuery, (r, c) =>
+    r.success ? undefined : c.json(zErr(r.error.issues), 400),
+  ),
+  async (c) => {
+    const { q, limit } = c.req.valid("query");
+    const rows = await db
+      .select({
+        id: courses.id,
+        title: courses.title,
+        status: courses.status,
+        fee: courses.fee,
+        institutionName: institutions.name,
+        district: institutions.district,
+      })
+      .from(courses)
+      .innerJoin(institutions, eq(courses.institutionId, institutions.id))
+      .where(
+        and(
+          ilike(courses.title, `%${q}%`),
+          inArray(courses.status, ["open", "upcoming"]),
+        ),
+      )
+      .orderBy(sql`similarity(${courses.title}, ${q}) desc`)
+      .limit(limit);
+
+    return c.json({
+      items: rows.map((r) => ({
+        id: r.id,
+        title: r.title,
+        status: r.status,
+        fee: r.fee,
+        institution: { name: r.institutionName, district: r.district },
+      })),
+    });
   },
 );
 

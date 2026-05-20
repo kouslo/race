@@ -2,7 +2,10 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import { getAccessToken } from "@/lib/auth";
 import { FavoriteButton } from "@/components/FavoriteButton";
+import { SearchInput } from "@/components/SearchInput";
 import type { CoursesListQuery } from "@daegu-courses/api-schemas";
+
+const PUBLIC_API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3000";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -39,12 +42,7 @@ export default async function CoursesPage({ searchParams }: { searchParams: Sear
       <h1 style={{ fontSize: 28, marginBottom: 16 }}>강좌</h1>
 
       <form style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24 }}>
-        <input
-          name="q"
-          defaultValue={q ?? ""}
-          placeholder="검색"
-          style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid #ccc", flex: 1, minWidth: 200 }}
-        />
+        <SearchInput apiBaseUrl={PUBLIC_API_BASE_URL} defaultValue={q ?? ""} />
         <select name="district" defaultValue={district ?? ""} style={selectStyle}>
           <option value="">전체 지역</option>
           {DISTRICTS.map((d) => (
