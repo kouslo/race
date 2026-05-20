@@ -29,38 +29,18 @@ export function ShareButton({ title }: { title: string }) {
   };
 
   return (
-    <div style={{ position: "relative" }}>
+    <div className="relative">
       <button
         type="button"
         onClick={handleClick}
         aria-label="공유"
         title="공유"
-        style={{
-          background: "transparent",
-          border: 0,
-          padding: 0,
-          fontSize: 20,
-          lineHeight: 1,
-          cursor: "pointer",
-          color: "#666",
-        }}
+        className="bg-transparent border-0 p-0 text-[20px] leading-none cursor-pointer text-foreground-muted hover:text-foreground"
       >
         ↗
       </button>
       {feedback && (
-        <span
-          style={{
-            position: "absolute",
-            top: "calc(100% + 6px)",
-            right: 0,
-            background: "#111",
-            color: "#fff",
-            fontSize: 11,
-            padding: "4px 8px",
-            borderRadius: 4,
-            whiteSpace: "nowrap",
-          }}
-        >
+        <span className="absolute top-[calc(100%+6px)] right-0 bg-foreground text-background text-[11px] px-2 py-1 rounded whitespace-nowrap">
           {feedback}
         </span>
       )}

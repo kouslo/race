@@ -1,6 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
+import { Button } from "@/components/ui";
 
 const ERRORS: Record<string, string> = {
   missing_code: "Kakao 응답에 인증 코드가 없습니다.",
@@ -35,26 +36,11 @@ export default function LoginButton() {
 
   return (
     <>
-      <button
-        onClick={handleKakao}
-        style={{
-          width: "100%",
-          background: "#fee500",
-          color: "#191919",
-          padding: "14px 18px",
-          border: 0,
-          borderRadius: 8,
-          fontWeight: 700,
-          fontSize: 15,
-          cursor: "pointer",
-        }}
-      >
+      <Button onClick={handleKakao} variant="kakao" size="lg" className="w-full">
         카카오로 시작하기
-      </button>
+      </Button>
       {errorKey && (
-        <p style={{ color: "#c33", marginTop: 24, fontSize: 13 }}>
-          {ERRORS[errorKey] ?? errorKey}
-        </p>
+        <p className="text-danger text-[13px] mt-6">{ERRORS[errorKey] ?? errorKey}</p>
       )}
     </>
   );

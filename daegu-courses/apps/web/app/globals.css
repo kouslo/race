@@ -1,26 +1,87 @@
+@import "tailwindcss";
+
+/* Light theme — referenced by `bg-background`, `text-foreground`, etc. */
+@theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo",
+    "Segoe UI", Roboto, sans-serif;
+
+  --color-background: #fafafa;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f5f5f5;
+  --color-border: #e5e5e5;
+  --color-foreground: #111111;
+  --color-foreground-muted: #666666;
+  --color-foreground-subtle: #999999;
+
+  --color-brand: #111111;
+  --color-brand-foreground: #ffffff;
+  --color-kakao: #fee500;
+  --color-kakao-foreground: #191919;
+
+  --color-status-open: #0a7d0a;
+  --color-status-upcoming: #5a6470;
+  --color-status-closed: #999999;
+  --color-status-full: #c8332e;
+  --color-status-cancelled: #999999;
+
+  --color-accent: #f5a623;
+  --color-danger: #c8332e;
+
+  --color-ring: #9ca3af;
+}
+
+/* Dark theme — applied via prefers-color-scheme. */
+@media (prefers-color-scheme: dark) {
+  @theme {
+    --color-background: #0a0a0a;
+    --color-surface: #161616;
+    --color-surface-muted: #1f1f1f;
+    --color-border: #2a2a2a;
+    --color-foreground: #f4f4f5;
+    --color-foreground-muted: #a1a1aa;
+    --color-foreground-subtle: #71717a;
+
+    --color-brand: #f4f4f5;
+    --color-brand-foreground: #111111;
+
+    --color-status-open: #2f9e2f;
+    --color-status-upcoming: #8a93a0;
+    --color-status-closed: #6b6b6b;
+    --color-status-full: #e25b56;
+
+    --color-ring: #525252;
+  }
+}
+
 :root {
   color-scheme: light dark;
-  font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo",
-    "Segoe UI", Roboto, sans-serif;
+}
+
+html,
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
 }
 
 * {
   box-sizing: border-box;
 }
 
-body {
-  margin: 0;
-  background: #fafafa;
-  color: #111;
-}
-
-@media (prefers-color-scheme: dark) {
-  body {
-    background: #0a0a0a;
-    color: #f4f4f5;
-  }
-}
-
 a {
   color: inherit;
+}
+
+/* Subtle, focusable buttons by default — Tailwind primitives override per use. */
+button {
+  font-family: inherit;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
 }

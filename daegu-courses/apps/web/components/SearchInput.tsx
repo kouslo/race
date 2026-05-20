@@ -2,20 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { StatusPill } from "@/components/ui/Pill";
+import { cn } from "@/components/ui/cn";
 import type { CourseSuggestion } from "@daegu-courses/api-client";
-
-const STATUS_LABEL: Record<string, string> = {
-  open: "접수중",
-  upcoming: "예정",
-  closed: "마감",
-  full: "정원마감",
-};
-const STATUS_COLOR: Record<string, string> = {
-  open: "#0a7d0a",
-  upcoming: "#666",
-  closed: "#999",
-  full: "#c33",
-};
 
 export function SearchInput({
   apiBaseUrl,
@@ -55,7 +44,7 @@ export function SearchInput({
         setActiveIdx(-1);
       } catch (err) {
         if ((err as Error).name !== "AbortError") {
-          // network errors are fine; suggestions are advisory
+          // suggestions are advisory; swallow network errors
         }
       }
     }, 200);
@@ -96,7 +85,7 @@ export function SearchInput({
   }
 
   return (
-    <div ref={wrapRef} style={{ position: "relative", flex: 1, minWidth: 200 }}>
+    <div ref={wrapRef} className="relative">
       <input
         ref={inputRef}
         name={name}
@@ -109,34 +98,12 @@ export function SearchInput({
         onKeyDown={onKeyDown}
         placeholder="강좌명 검색"
         autoComplete="off"
-        style={{
-          width: "100%",
-          padding: "8px 12px",
-          borderRadius: 6,
-          border: "1px solid #ccc",
-          background: "transparent",
-          color: "inherit",
-        }}
+        className="h-10 w-full px-3 text-[14px] rounded-md bg-transparent text-foreground border border-border placeholder:text-foreground-subtle focus-visible:border-foreground-muted"
       />
       {open && items.length > 0 && (
         <ul
           role="listbox"
-          style={{
-            position: "absolute",
-            top: "calc(100% + 4px)",
-            left: 0,
-            right: 0,
-            zIndex: 10,
-            background: "var(--card, #fff)",
-            border: "1px solid #e5e5e5",
-            borderRadius: 8,
-            boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
-            padding: 4,
-            margin: 0,
-            listStyle: "none",
-            maxHeight: 400,
-            overflowY: "auto",
-          }}
+          className="absolute left-0 right-0 top-[calc(100%+4px)] z-10 bg-surface border border-border rounded-lg shadow-lg p-1 m-0 list-none max-h-[420px] overflow-y-auto"
         >
           {items.map((s, i) => (
             <li
@@ -148,45 +115,19 @@ export function SearchInput({
                 selectItem(s);
               }}
               onMouseEnter={() => setActiveIdx(i)}
-              style={{
-                padding: "8px 10px",
-                borderRadius: 6,
-                cursor: "pointer",
-                background: i === activeIdx ? "#f3f3f3" : "transparent",
-                display: "grid",
-                gridTemplateColumns: "1fr auto",
-                gap: 8,
-                alignItems: "center",
-              }}
+              className={cn(
+                "px-2.5 py-2 rounded-md cursor-pointer grid grid-cols-[1fr_auto] gap-2 items-center",
+                i === activeIdx ? "bg-surface-muted" : "bg-transparent",
+              )}
             >
-              <div style={{ minWidth: 0 }}>
-                <div
-                  style={{
-                    fontSize: 14,
-                    fontWeight: 500,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {s.title}
-                </div>
-                <div style={{ color: "#888", fontSize: 11, marginTop: 2 }}>
+              <div className="min-w-0">
+                <div className="text-[13.5px] font-medium truncate">{s.title}</div>
+                <div className="text-[11px] text-foreground-subtle mt-0.5">
                   {s.institution.name} · {s.institution.district}
                   {s.fee === 0 ? " · 무료" : ` · ${s.fee.toLocaleString()}원`}
                 </div>
               </div>
-              <span
-                style={{
-                  background: STATUS_COLOR[s.status] ?? "#999",
-                  color: "#fff",
-                  fontSize: 10,
-                  padding: "1px 6px",
-                  borderRadius: 999,
-                }}
-              >
-                {STATUS_LABEL[s.status] ?? s.status}
-              </span>
+              <StatusPill status={s.status} />
             </li>
           ))}
         </ul>

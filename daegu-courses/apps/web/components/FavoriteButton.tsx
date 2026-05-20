@@ -1,4 +1,5 @@
 import { toggleFavoriteAction } from "@/app/favorites/actions";
+import { cn } from "@/components/ui/cn";
 
 export function FavoriteButton(props: {
   targetType: "course" | "event";
@@ -13,15 +14,10 @@ export function FavoriteButton(props: {
         type="submit"
         aria-label={props.isFavorited ? "즐겨찾기 해제" : "즐겨찾기 추가"}
         title={props.isFavorited ? "즐겨찾기 해제" : "즐겨찾기 추가"}
-        style={{
-          background: "transparent",
-          border: 0,
-          padding: 0,
-          fontSize: 20,
-          lineHeight: 1,
-          cursor: "pointer",
-          color: props.isFavorited ? "#f5a623" : "#bbb",
-        }}
+        className={cn(
+          "bg-transparent border-0 p-0 text-[22px] leading-none cursor-pointer",
+          props.isFavorited ? "text-accent" : "text-foreground-subtle hover:text-foreground-muted",
+        )}
       >
         {props.isFavorited ? "★" : "☆"}
       </button>

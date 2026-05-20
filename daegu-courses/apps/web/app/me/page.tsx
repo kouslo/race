@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { api } from "@/lib/api";
 import { getAccessToken } from "@/lib/auth";
 import { FavoriteButton } from "@/components/FavoriteButton";
+import { Button, ButtonLink, Card, Container } from "@/components/ui";
 
 export default async function MePage() {
   const token = await getAccessToken();
@@ -17,59 +18,49 @@ export default async function MePage() {
   const favs = await api.favorites.list();
 
   return (
-    <main style={{ maxWidth: 900, margin: "0 auto", padding: "32px 24px" }}>
-      <header
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 24,
-        }}
-      >
+    <Container size="md" className="py-8">
+      <header className="flex items-center justify-between mb-6">
         <div>
-          <h1 style={{ fontSize: 24, margin: 0 }}>{me.nickname}</h1>
-          <div style={{ color: "#666", fontSize: 13, marginTop: 4 }}>{me.email ?? me.provider}</div>
+          <h1 className="text-[24px] font-bold m-0">{me.nickname}</h1>
+          <div className="text-[12.5px] text-foreground-muted mt-1">
+            {me.email ?? me.provider}
+          </div>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <Link
-            href="/me/notifications"
-            style={{ padding: "6px 12px", border: "1px solid #ccc", borderRadius: 6, textDecoration: "none", fontSize: 13 }}
-          >
+        <div className="flex gap-2">
+          <ButtonLink href="/me/notifications" variant="secondary" size="sm">
             🔔 알림 설정
-          </Link>
+          </ButtonLink>
           <form action="/logout" method="POST">
-            <button
-              type="submit"
-              style={{ padding: "6px 12px", border: "1px solid #ccc", borderRadius: 6, background: "transparent", cursor: "pointer", fontSize: 13 }}
-            >
+            <Button type="submit" variant="ghost" size="sm">
               로그아웃
-            </button>
+            </Button>
           </form>
         </div>
       </header>
 
-      <section style={{ marginBottom: 32 }}>
-        <h2 style={{ fontSize: 18, marginBottom: 12 }}>즐겨찾기한 강좌 ({favs.courses.length})</h2>
+      <section className="mb-8">
+        <h2 className="text-[16px] font-semibold mb-3">
+          즐겨찾기한 강좌{" "}
+          <span className="text-foreground-subtle font-normal">({favs.courses.length})</span>
+        </h2>
         {favs.courses.length === 0 ? (
           <EmptyState>
-            <Link href="/courses">강좌 둘러보기</Link>로 가서 관심 있는 강좌의 ★을 눌러보세요.
+            <Link href="/courses" className="underline">
+              강좌 둘러보기
+            </Link>
+            로 가서 관심 있는 강좌의 ★을 눌러보세요.
           </EmptyState>
         ) : (
-          <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 10 }}>
+          <ul className="list-none p-0 grid gap-2">
             {favs.courses.map((f) => (
-              <li
-                key={f.id}
-                style={{
-                  border: "1px solid #e5e5e5",
-                  borderRadius: 10,
-                  padding: 14,
-                  background: "var(--card, #fff)",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                  <a href={f.target.applyUrl} target="_blank" rel="noreferrer" style={{ fontWeight: 600 }}>
+              <Card as="li" hover key={f.id} className="p-3.5">
+                <div className="flex justify-between gap-3">
+                  <Link
+                    href={`/courses/${f.target.id}`}
+                    className="font-semibold no-underline text-foreground"
+                  >
                     {f.target.title}
-                  </a>
+                  </Link>
                   <FavoriteButton
                     targetType="course"
                     targetId={f.target.id}
@@ -77,39 +68,39 @@ export default async function MePage() {
                     nextPath="/me"
                   />
                 </div>
-                <div style={{ color: "#666", fontSize: 13, marginTop: 6 }}>
+                <div className="mt-1.5 text-[12.5px] text-foreground-muted">
                   {f.target.institution.name}
                   {f.target.startDate && ` · ${f.target.startDate}~`}
                 </div>
                 {f.target.applyEndAt && (
-                  <div style={{ color: "#888", fontSize: 12, marginTop: 4 }}>
+                  <div className="mt-1 text-[11.5px] text-foreground-subtle">
                     접수마감 {new Date(f.target.applyEndAt).toLocaleString("ko-KR")}
                   </div>
                 )}
-              </li>
+              </Card>
             ))}
           </ul>
         )}
       </section>
 
       <section>
-        <h2 style={{ fontSize: 18, marginBottom: 12 }}>즐겨찾기한 행사 ({favs.events.length})</h2>
+        <h2 className="text-[16px] font-semibold mb-3">
+          즐겨찾기한 행사{" "}
+          <span className="text-foreground-subtle font-normal">({favs.events.length})</span>
+        </h2>
         {favs.events.length === 0 ? (
           <EmptyState>관심 있는 문화행사가 생기면 여기에 모입니다.</EmptyState>
         ) : (
-          <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 10 }}>
+          <ul className="list-none p-0 grid gap-2">
             {favs.events.map((f) => (
-              <li
-                key={f.id}
-                style={{
-                  border: "1px solid #e5e5e5",
-                  borderRadius: 10,
-                  padding: 14,
-                  background: "var(--card, #fff)",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                  <a href={f.target.reserveUrl ?? "#"} target="_blank" rel="noreferrer" style={{ fontWeight: 600 }}>
+              <Card as="li" hover key={f.id} className="p-3.5">
+                <div className="flex justify-between gap-3">
+                  <a
+                    href={f.target.reserveUrl ?? "#"}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-semibold no-underline text-foreground"
+                  >
                     {f.target.title}
                   </a>
                   <FavoriteButton
@@ -119,33 +110,24 @@ export default async function MePage() {
                     nextPath="/me"
                   />
                 </div>
-                <div style={{ color: "#666", fontSize: 13, marginTop: 6 }}>
+                <div className="mt-1.5 text-[12.5px] text-foreground-muted">
                   {f.target.institution.name} · {f.target.location}
                 </div>
-                <div style={{ color: "#888", fontSize: 12, marginTop: 4 }}>
+                <div className="mt-1 text-[11.5px] text-foreground-subtle">
                   {new Date(f.target.eventStartAt).toLocaleString("ko-KR")}
                 </div>
-              </li>
+              </Card>
             ))}
           </ul>
         )}
       </section>
-    </main>
+    </Container>
   );
 }
 
 function EmptyState({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      style={{
-        border: "1px dashed #ddd",
-        borderRadius: 10,
-        padding: 24,
-        textAlign: "center",
-        color: "#888",
-        fontSize: 13,
-      }}
-    >
+    <div className="border border-dashed border-border rounded-xl px-6 py-7 text-center text-foreground-subtle text-[13px]">
       {children}
     </div>
   );

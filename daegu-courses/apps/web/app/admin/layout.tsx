@@ -1,39 +1,37 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { Container } from "@/components/ui";
 import { requireAdmin } from "@/lib/require-admin";
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const user = await requireAdmin();
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto", padding: "24px" }}>
-      <header
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 24,
-          paddingBottom: 12,
-          borderBottom: "1px solid #e5e5e5",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-          <Link href="/admin" style={{ fontWeight: 700, fontSize: 18, textDecoration: "none" }}>
+    <Container size="lg" className="py-6">
+      <header className="flex items-center justify-between border-b border-border pb-3 mb-6">
+        <div className="flex items-center gap-5">
+          <Link href="/admin" className="font-bold text-[18px] no-underline">
             🛠 Admin
           </Link>
-          <nav style={{ display: "flex", gap: 14, fontSize: 14 }}>
-            <Link href="/admin/institutions">기관</Link>
-            <Link href="/admin/sources">크롤 소스</Link>
-            <Link href="/admin/logs">로그</Link>
+          <nav className="flex gap-3.5 text-[13px] text-foreground-muted">
+            <Link href="/admin/institutions" className="hover:text-foreground">
+              기관
+            </Link>
+            <Link href="/admin/sources" className="hover:text-foreground">
+              크롤 소스
+            </Link>
+            <Link href="/admin/logs" className="hover:text-foreground">
+              로그
+            </Link>
           </nav>
         </div>
-        <div style={{ fontSize: 13, color: "#666" }}>
+        <div className="text-[12px] text-foreground-muted">
           {user.nickname} ·{" "}
-          <Link href="/" style={{ textDecoration: "underline" }}>
+          <Link href="/" className="underline">
             사이트로 돌아가기
           </Link>
         </div>
       </header>
       {children}
-    </div>
+    </Container>
   );
 }

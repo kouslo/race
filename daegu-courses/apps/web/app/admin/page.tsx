@@ -1,4 +1,5 @@
 import { api } from "@/lib/api";
+import { Card } from "@/components/ui";
 
 export default async function AdminDashboard() {
   const stats = await api.admin.stats();
@@ -11,29 +12,13 @@ export default async function AdminDashboard() {
 
   return (
     <main>
-      <h1 style={{ fontSize: 24, marginBottom: 24 }}>대시보드</h1>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-          gap: 12,
-        }}
-      >
+      <h1 className="text-[22px] font-bold mb-6">대시보드</h1>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
         {items.map((s) => (
-          <div
-            key={s.label}
-            style={{
-              border: "1px solid #e5e5e5",
-              borderRadius: 10,
-              padding: 16,
-              background: "var(--card, #fff)",
-            }}
-          >
-            <div style={{ fontSize: 13, color: "#666" }}>{s.label}</div>
-            <div style={{ fontSize: 28, fontWeight: 700, marginTop: 4 }}>
-              {s.value.toLocaleString()}
-            </div>
-          </div>
+          <Card key={s.label} className="p-4">
+            <div className="text-[12px] text-foreground-muted">{s.label}</div>
+            <div className="text-[28px] font-bold mt-1">{s.value.toLocaleString()}</div>
+          </Card>
         ))}
       </div>
     </main>

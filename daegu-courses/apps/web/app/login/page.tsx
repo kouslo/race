@@ -1,16 +1,17 @@
 import { Suspense } from "react";
+import { Container } from "@/components/ui";
 import LoginButton from "./LoginButton";
 
 export default function LoginPage() {
   return (
-    <main style={{ maxWidth: 420, margin: "0 auto", padding: "64px 24px", textAlign: "center" }}>
-      <h1 style={{ fontSize: 24, marginBottom: 12 }}>로그인</h1>
-      <p style={{ color: "#666", marginBottom: 32 }}>
+    <Container size="sm" className="py-16 text-center">
+      <h1 className="text-[24px] font-bold mb-3">로그인</h1>
+      <p className="text-foreground-muted text-[14px] mb-8">
         즐겨찾기·알림을 사용하려면 로그인이 필요합니다.
       </p>
       <Suspense fallback={null}>
         <LoginButton />
       </Suspense>
-    </main>
+    </Container>
   );
 }

@@ -3,6 +3,13 @@ import { api } from "@/lib/api";
 import { getAccessToken } from "@/lib/auth";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { SearchInput } from "@/components/SearchInput";
+import {
+  Button,
+  Card,
+  Container,
+  SelectInput,
+  StatusPill,
+} from "@/components/ui";
 import type { CoursesListQuery } from "@daegu-courses/api-schemas";
 
 const PUBLIC_API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3000";
@@ -24,8 +31,10 @@ const DISTRICTS: CoursesListQuery["district"][] = [
 export default async function CoursesPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
   const q = typeof sp.q === "string" ? sp.q : undefined;
-  const district = typeof sp.district === "string" ? (sp.district as CoursesListQuery["district"]) : undefined;
-  const status = typeof sp.status === "string" ? (sp.status as CoursesListQuery["status"]) : "open";
+  const district =
+    typeof sp.district === "string" ? (sp.district as CoursesListQuery["district"]) : undefined;
+  const status =
+    typeof sp.status === "string" ? (sp.status as CoursesListQuery["status"]) : "open";
 
   const sort: CoursesListQuery["sort"] = q ? "relevance" : "applyEndSoon";
   const [res, favoritedIds] = await Promise.all([
@@ -34,82 +43,84 @@ export default async function CoursesPage({ searchParams }: { searchParams: Sear
   ]);
 
   const nextPath = `/courses?${new URLSearchParams(
-    Object.fromEntries(Object.entries({ q, district, status }).filter(([, v]) => v)) as Record<string, string>,
+    Object.fromEntries(
+      Object.entries({ q, district, status }).filter(([, v]) => v),
+    ) as Record<string, string>,
   ).toString()}`;
 
   return (
-    <main style={{ maxWidth: 1024, margin: "0 auto", padding: "32px 24px" }}>
-      <h1 style={{ fontSize: 28, marginBottom: 16 }}>강좌</h1>
+    <Container size="lg" className="py-8">
+      <header className="mb-6 flex items-baseline justify-between gap-4">
+        <h1 className="text-[24px] font-bold">강좌</h1>
+        <Link
+          href="/"
+          className="text-[12px] text-foreground-muted hover:underline"
+        >
+          홈으로
+        </Link>
+      </header>
 
-      <form style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24 }}>
-        <SearchInput apiBaseUrl={PUBLIC_API_BASE_URL} defaultValue={q ?? ""} />
-        <select name="district" defaultValue={district ?? ""} style={selectStyle}>
+      <form className="grid grid-cols-[1fr_auto_auto_auto] gap-2 mb-6 max-sm:grid-cols-2">
+        <div className="max-sm:col-span-2">
+          <SearchInput apiBaseUrl={PUBLIC_API_BASE_URL} defaultValue={q ?? ""} />
+        </div>
+        <SelectInput name="district" defaultValue={district ?? ""}>
           <option value="">전체 지역</option>
           {DISTRICTS.map((d) => (
             <option key={d} value={d}>
               {d}
             </option>
           ))}
-        </select>
-        <select name="status" defaultValue={status} style={selectStyle}>
+        </SelectInput>
+        <SelectInput name="status" defaultValue={status}>
           <option value="open">접수중</option>
           <option value="upcoming">접수예정</option>
           <option value="closed">마감</option>
           <option value="full">정원마감</option>
-        </select>
-        <button type="submit" style={{ ...selectStyle, background: "#111", color: "#fff", border: 0 }}>
-          검색
-        </button>
+        </SelectInput>
+        <Button type="submit">검색</Button>
       </form>
 
-      <p style={{ color: "#666", marginBottom: 16 }}>총 {res.total}개</p>
+      <p className="text-[12px] text-foreground-muted mb-3">총 {res.total}개</p>
 
-      <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 12 }}>
+      <ul className="list-none p-0 grid gap-2">
         {res.items.map((c) => (
-          <li
-            key={c.id}
-            style={{
-              border: "1px solid #e5e5e5",
-              borderRadius: 10,
-              padding: 16,
-              background: "var(--card, #fff)",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+          <Card as="li" key={c.id} hover className="p-4">
+            <div className="flex items-start justify-between gap-3">
               <Link
                 href={`/courses/${c.id}`}
-                style={{ fontWeight: 600, fontSize: 16, flex: 1, textDecoration: "none", color: "inherit" }}
+                className="font-semibold text-[15px] no-underline text-foreground flex-1"
               >
                 {c.title}
               </Link>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+              <div className="flex items-center gap-3 shrink-0">
                 <FavoriteButton
                   targetType="course"
                   targetId={c.id}
                   isFavorited={favoritedIds.has(c.id)}
                   nextPath={nextPath}
                 />
-                <StatusBadge status={c.status} />
+                <StatusPill status={c.status} />
               </div>
             </div>
-            <div style={{ color: "#666", fontSize: 13, marginTop: 6 }}>
+            <div className="mt-1.5 text-[12.5px] text-foreground-muted">
               {c.institution.name} · {c.institution.district}
               {c.startDate && ` · ${c.startDate}~${c.endDate ?? ""}`}
               {c.fee === 0 ? " · 무료" : ` · ${c.fee.toLocaleString()}원`}
             </div>
             {c.applyEndAt && (
-              <div style={{ color: "#888", fontSize: 12, marginTop: 4 }}>
+              <div className="mt-1 text-[11.5px] text-foreground-subtle">
                 접수마감 {new Date(c.applyEndAt).toLocaleString("ko-KR")}
               </div>
             )}
-          </li>
+          </Card>
         ))}
       </ul>
 
       {res.items.length === 0 && (
-        <p style={{ color: "#999", textAlign: "center", padding: 40 }}>강좌가 없습니다.</p>
+        <p className="text-foreground-subtle text-center py-10">강좌가 없습니다.</p>
       )}
-    </main>
+    </Container>
   );
 }
 
@@ -123,43 +134,3 @@ async function loadFavoritedCourseIds(): Promise<Set<string>> {
     return new Set();
   }
 }
-
-function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    open: "#0a7d0a",
-    upcoming: "#666",
-    closed: "#999",
-    full: "#c33",
-    cancelled: "#999",
-  };
-  const label: Record<string, string> = {
-    open: "접수중",
-    upcoming: "예정",
-    closed: "마감",
-    full: "정원마감",
-    cancelled: "취소",
-  };
-  return (
-    <span
-      style={{
-        background: colors[status] ?? "#999",
-        color: "#fff",
-        fontSize: 11,
-        padding: "2px 8px",
-        borderRadius: 999,
-        flexShrink: 0,
-        alignSelf: "flex-start",
-      }}
-    >
-      {label[status] ?? status}
-    </span>
-  );
-}
-
-const selectStyle = {
-  padding: "8px 12px",
-  borderRadius: 6,
-  border: "1px solid #ccc",
-  background: "transparent",
-  color: "inherit",
-} as const;
