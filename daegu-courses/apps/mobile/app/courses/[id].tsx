@@ -4,6 +4,7 @@ import {
   Linking,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -46,6 +47,7 @@ export default function CourseDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { state, api } = useAuth();
   const [data, setData] = useState<{ course: CourseFull; institution: Institution } | null>(null);
+  const [similar, setSimilar] = useState<CourseListItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isFav, setIsFav] = useState(false);
   const [favId, setFavId] = useState<string | null>(null);
@@ -56,7 +58,24 @@ export default function CourseDetail() {
       .byId(id)
       .then((r) => setData(r as never))
       .catch((e) => setError(String(e)));
+    publicApi.courses
+      .similar(id)
+      .then((r) => setSimilar(r.items))
+      .catch(() => setSimilar([]));
   }, [id]);
+
+  async function handleShare() {
+    if (!data) return;
+    try {
+      await Share.share({
+        title: data.course.title,
+        message: `${data.course.title} — 대구 강좌\n${data.course.applyUrl}`,
+        url: data.course.applyUrl,
+      });
+    } catch {
+      // user cancelled
+    }
+  }
 
   const loadFav = useCallback(async () => {
     if (state.status !== "authenticated" || !id) return;
@@ -109,8 +128,11 @@ export default function CourseDetail() {
         </Pill>
       </View>
 
-      <View style={{ flexDirection: "row", gap: 12, alignItems: "flex-start" }}>
+      <View style={{ flexDirection: "row", gap: 14, alignItems: "flex-start" }}>
         <Text style={styles.title}>{course.title}</Text>
+        <Pressable onPress={handleShare} hitSlop={8} accessibilityLabel="공유">
+          <Text style={{ fontSize: 22, color: "#666" }}>↗</Text>
+        </Pressable>
         <Pressable
           onPress={toggleFav}
           hitSlop={8}
@@ -180,6 +202,44 @@ export default function CourseDetail() {
         </Section>
       )}
 
+      {similar.length > 0 && (
+        <View style={{ marginTop: 8 }}>
+          <Text style={[styles.sectionTitle, { marginBottom: 10, fontSize: 14, fontWeight: "600" }]}>
+            비슷한 강좌
+          </Text>
+          {similar.map((s) => (
+            <Pressable
+              key={s.id}
+              onPress={() => router.replace(`/courses/${s.id}`)}
+              style={styles.similarCard}
+            >
+              <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
+                <Text style={styles.similarTitle} numberOfLines={2}>
+                  {s.title}
+                </Text>
+                <View
+                  style={{
+                    backgroundColor: STATUS_COLOR[s.status] ?? "#999",
+                    paddingHorizontal: 8,
+                    paddingVertical: 2,
+                    borderRadius: 999,
+                    alignSelf: "flex-start",
+                  }}
+                >
+                  <Text style={{ color: "#fff", fontSize: 10 }}>
+                    {STATUS_LABEL[s.status] ?? s.status}
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.similarMeta}>
+                {s.institution.name} · {s.institution.district}
+                {s.fee === 0 ? " · 무료" : ` · ${s.fee.toLocaleString()}원`}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+
       <Text style={styles.disclaimer}>
         이 정보는 기관 페이지에서 자동 수집되었습니다. 최신 정보는 원본을 확인하세요.
       </Text>
@@ -233,4 +293,14 @@ const styles = StyleSheet.create({
   dlLabel: { width: 80, color: "#888", fontSize: 13 },
   dlValue: { flex: 1, color: "#222", fontSize: 13 },
   disclaimer: { color: "#aaa", fontSize: 10, textAlign: "center", marginTop: 16 },
+  similarCard: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "#e5e5e5",
+    marginBottom: 8,
+  },
+  similarTitle: { flex: 1, fontSize: 13, fontWeight: "600" },
+  similarMeta: { fontSize: 11, color: "#666", marginTop: 4 },
 });

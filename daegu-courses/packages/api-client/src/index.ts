@@ -131,6 +131,8 @@ export function createClient(opts: ClientOptions) {
         call<{ course: CourseListItem & Record<string, unknown>; institution: Institution }>(
           `/api/v1/courses/${id}`,
         ),
+      similar: (id: string) =>
+        call<{ items: CourseListItem[] }>(`/api/v1/courses/${id}/similar`),
     },
     events: {
       list: (q: Partial<EventsListQuery> = {}) =>

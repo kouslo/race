@@ -3,6 +3,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import { getAccessToken } from "@/lib/auth";
 import { FavoriteButton } from "@/components/FavoriteButton";
+import { ShareButton } from "@/components/ShareButton";
 
 type Params = Promise<{ id: string }>;
 
@@ -56,7 +57,10 @@ export default async function CourseDetailPage({ params }: { params: Params }) {
   const { course, institution } = res;
 
   const token = await getAccessToken();
-  const favs = token ? await api.favorites.list().catch(() => null) : null;
+  const [favs, similar] = await Promise.all([
+    token ? api.favorites.list().catch(() => null) : Promise.resolve(null),
+    api.courses.similar(course.id).catch(() => ({ items: [] as Awaited<ReturnType<typeof api.courses.similar>>["items"] })),
+  ]);
   const isFavorited = favs?.courses.some((f) => f.target.id === course.id) ?? false;
 
   const schedule = (course.schedule as { dayOfWeek: string; startTime: string; endTime: string }[] | null) ?? [];
@@ -83,12 +87,15 @@ export default async function CourseDetailPage({ params }: { params: Params }) {
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
           <h1 style={{ fontSize: 24, margin: 0, lineHeight: 1.35, flex: 1 }}>{course.title}</h1>
-          <FavoriteButton
-            targetType="course"
-            targetId={course.id}
-            isFavorited={isFavorited}
-            nextPath={`/courses/${course.id}`}
-          />
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <ShareButton title={course.title} />
+            <FavoriteButton
+              targetType="course"
+              targetId={course.id}
+              isFavorited={isFavorited}
+              nextPath={`/courses/${course.id}`}
+            />
+          </div>
         </div>
         <div style={{ color: "#666", fontSize: 14, marginTop: 8 }}>
           <Link href={institution.homepageUrl ?? "#"} target="_blank" rel="noreferrer">
@@ -151,6 +158,41 @@ export default async function CourseDetailPage({ params }: { params: Params }) {
         <Section title="안내">
           <p style={{ whiteSpace: "pre-wrap", color: "#333", lineHeight: 1.6, margin: 0 }}>{description}</p>
         </Section>
+      )}
+
+      {similar.items.length > 0 && (
+        <section style={{ marginTop: 24 }}>
+          <h2 style={{ fontSize: 16, marginBottom: 12 }}>비슷한 강좌</h2>
+          <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 10 }}>
+            {similar.items.map((s) => (
+              <li key={s.id}>
+                <Link
+                  href={`/courses/${s.id}`}
+                  style={{
+                    display: "block",
+                    border: "1px solid #e5e5e5",
+                    borderRadius: 10,
+                    padding: 12,
+                    background: "var(--card, #fff)",
+                    textDecoration: "none",
+                    color: "inherit",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                    <span style={{ fontWeight: 600, fontSize: 14 }}>{s.title}</span>
+                    <Pill bg={STATUS_COLOR[s.status] ?? "#999"} fg="#fff">
+                      {STATUS_LABEL[s.status] ?? s.status}
+                    </Pill>
+                  </div>
+                  <div style={{ color: "#666", fontSize: 12, marginTop: 4 }}>
+                    {s.institution.name} · {s.institution.district}
+                    {s.fee === 0 ? " · 무료" : ` · ${s.fee.toLocaleString()}원`}
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       <p style={{ color: "#aaa", fontSize: 11, marginTop: 32, textAlign: "center" }}>

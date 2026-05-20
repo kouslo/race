@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { and, asc, count, desc, eq, gt, ilike, lte, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, ilike, lte, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/client";
 import { courses } from "../db/schema/courses";
@@ -119,5 +119,98 @@ coursesRoute.get(
 
     if (!row) return c.json({ error: "not_found" }, 404);
     return c.json(row);
+  },
+);
+
+/**
+ * Similar courses for the detail page. Strategy:
+ *   1) same category & same district & open (best match)
+ *   2) fall back to same category & open across districts
+ *   3) finally same district & open
+ * Always excludes the source course itself; capped at 6.
+ */
+coursesRoute.get(
+  "/:id/similar",
+  zValidator("param", z.object({ id: z.string().uuid() }), (r, c) =>
+    r.success ? undefined : c.json(zErr(r.error.issues), 400),
+  ),
+  async (c) => {
+    const { id } = c.req.valid("param");
+    const [source] = await db
+      .select({
+        category: courses.category,
+        district: institutions.district,
+        institutionId: courses.institutionId,
+      })
+      .from(courses)
+      .innerJoin(institutions, eq(courses.institutionId, institutions.id))
+      .where(eq(courses.id, id));
+    if (!source) return c.json({ items: [] });
+
+    const limit = 6;
+    const select = () =>
+      db
+        .select({
+          id: courses.id,
+          title: courses.title,
+          category: courses.category,
+          status: courses.status,
+          fee: courses.fee,
+          startDate: courses.startDate,
+          endDate: courses.endDate,
+          applyStartAt: courses.applyStartAt,
+          applyEndAt: courses.applyEndAt,
+          schedule: courses.schedule,
+          capacity: courses.capacity,
+          enrolled: courses.enrolled,
+          thumbnailUrl: courses.thumbnailUrl,
+          applyUrl: courses.applyUrl,
+          institution: {
+            id: institutions.id,
+            name: institutions.name,
+            district: institutions.district,
+          },
+        })
+        .from(courses)
+        .innerJoin(institutions, eq(courses.institutionId, institutions.id));
+
+    const baseFilters = [ne(courses.id, id), eq(courses.status, "open" as const)];
+
+    let rows = await select()
+      .where(
+        and(
+          ...baseFilters,
+          eq(courses.category, source.category),
+          eq(institutions.district, source.district),
+        ),
+      )
+      .orderBy(desc(courses.updatedAt))
+      .limit(limit);
+
+    if (rows.length < limit) {
+      const extras = await select()
+        .where(and(...baseFilters, eq(courses.category, source.category)))
+        .orderBy(desc(courses.updatedAt))
+        .limit(limit);
+      const seen = new Set(rows.map((r) => r.id));
+      for (const e of extras) {
+        if (rows.length >= limit) break;
+        if (!seen.has(e.id)) rows.push(e);
+      }
+    }
+
+    if (rows.length < limit) {
+      const extras = await select()
+        .where(and(...baseFilters, eq(institutions.district, source.district)))
+        .orderBy(desc(courses.updatedAt))
+        .limit(limit);
+      const seen = new Set(rows.map((r) => r.id));
+      for (const e of extras) {
+        if (rows.length >= limit) break;
+        if (!seen.has(e.id)) rows.push(e);
+      }
+    }
+
+    return c.json({ items: rows });
   },
 );
