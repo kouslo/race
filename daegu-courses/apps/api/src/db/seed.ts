@@ -44,20 +44,23 @@ const SEEDS: SeedInstitution[] = [
 
 async function main() {
   for (const seed of SEEDS) {
-    const [inst] = await db
-      .insert(institutions)
-      .values({
-        slug: seed.slug,
-        name: seed.name,
-        type: "library",
-        district: seed.district,
-        homepageUrl: seed.homepageUrl,
-      })
-      .onConflictDoUpdate({
-        target: institutions.slug,
-        set: { name: seed.name, district: seed.district, homepageUrl: seed.homepageUrl },
-      })
-      .returning({ id: institutions.id });
+    const inst = await firstRow(
+      db
+        .insert(institutions)
+        .values({
+          slug: seed.slug,
+          name: seed.name,
+          type: "library",
+          district: seed.district,
+          homepageUrl: seed.homepageUrl,
+        })
+        .onConflictDoUpdate({
+          target: institutions.slug,
+          set: { name: seed.name, district: seed.district, homepageUrl: seed.homepageUrl },
+        })
+        .returning({ id: institutions.id }),
+      `failed to upsert institution ${seed.slug}`,
+    );
 
     const existing = await db
       .select({ id: crawlSources.id })
@@ -76,6 +79,13 @@ async function main() {
       console.log(`= source already present: ${seed.name}`);
     }
   }
+}
+
+async function firstRow<T>(p: Promise<T[]>, errMsg: string): Promise<T> {
+  const rows = await p;
+  const row = rows[0];
+  if (!row) throw new Error(errMsg);
+  return row;
 }
 
 main()

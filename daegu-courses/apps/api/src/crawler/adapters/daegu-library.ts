@@ -103,9 +103,9 @@ export const daeguLibraryAdapter: CourseAdapter = {
   async run(ctx: AdapterContext): Promise<AdapterResult> {
     const { sourceUrl, fetcher, logger } = ctx;
     const u = new URL(sourceUrl);
-    const branch = u.pathname.split("/").filter(Boolean)[0];
+    const branch = u.pathname.split("/").filter(Boolean)[0] ?? "";
     const homepageId =
-      u.searchParams.get("homepage_id") ?? BRANCH_DEFAULT_HMPG[branch] ?? "";
+      u.searchParams.get("homepage_id") ?? (branch ? BRANCH_DEFAULT_HMPG[branch] ?? "" : "");
     const menuIdx = u.searchParams.get("menu_idx") ?? "";
     const searchCate1 = u.searchParams.get("searchCate1") ?? "";
 
@@ -184,9 +184,9 @@ function toNum(v: unknown): number | undefined {
 function parseYmd(s?: string): string | undefined {
   if (!s) return undefined;
   const compact = s.match(/^(\d{4})(\d{2})(\d{2})$/);
-  if (compact) return `${compact[1]}-${compact[2]}-${compact[3]}`;
+  if (compact) return `${compact[1]!}-${compact[2]!}-${compact[3]!}`;
   const sep = s.match(/(\d{4})\D(\d{1,2})\D(\d{1,2})/);
-  if (sep) return `${sep[1]}-${sep[2].padStart(2, "0")}-${sep[3].padStart(2, "0")}`;
+  if (sep) return `${sep[1]!}-${sep[2]!.padStart(2, "0")}-${sep[3]!.padStart(2, "0")}`;
   return undefined;
 }
 
@@ -231,7 +231,7 @@ function normalizeTime(t?: string): string | undefined {
   if (!t) return undefined;
   const m = t.match(/^(\d{1,2}):?(\d{2})$/);
   if (!m) return undefined;
-  return `${m[1].padStart(2, "0")}:${m[2]}`;
+  return `${m[1]!.padStart(2, "0")}:${m[2]!}`;
 }
 
 /**

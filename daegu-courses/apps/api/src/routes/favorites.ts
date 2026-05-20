@@ -17,19 +17,21 @@ favoritesRoute.use("*", requireAuth);
 favoritesRoute.get("/", async (c) => {
   const userId = c.var.userId;
 
-  const courseFavs = await db
+  // Drizzle's nested select doesn't support double-nesting cleanly,
+  // so we select a flat row and reshape into the public {target, institution}
+  // structure here in JS.
+  const courseRows = await db
     .select({
-      id: favorites.id,
-      createdAt: favorites.createdAt,
-      target: {
-        id: courses.id,
-        title: courses.title,
-        status: courses.status,
-        startDate: courses.startDate,
-        applyEndAt: courses.applyEndAt,
-        applyUrl: courses.applyUrl,
-        institution: { id: institutions.id, name: institutions.name },
-      },
+      favId: favorites.id,
+      favCreatedAt: favorites.createdAt,
+      courseId: courses.id,
+      title: courses.title,
+      status: courses.status,
+      startDate: courses.startDate,
+      applyEndAt: courses.applyEndAt,
+      applyUrl: courses.applyUrl,
+      institutionId: institutions.id,
+      institutionName: institutions.name,
     })
     .from(favorites)
     .innerJoin(courses, eq(favorites.targetId, courses.id))
@@ -37,18 +39,17 @@ favoritesRoute.get("/", async (c) => {
     .where(and(eq(favorites.userId, userId), eq(favorites.targetType, "course")))
     .orderBy(desc(favorites.createdAt));
 
-  const eventFavs = await db
+  const eventRows = await db
     .select({
-      id: favorites.id,
-      createdAt: favorites.createdAt,
-      target: {
-        id: events.id,
-        title: events.title,
-        eventStartAt: events.eventStartAt,
-        location: events.location,
-        reserveUrl: events.reserveUrl,
-        institution: { id: institutions.id, name: institutions.name },
-      },
+      favId: favorites.id,
+      favCreatedAt: favorites.createdAt,
+      eventId: events.id,
+      title: events.title,
+      eventStartAt: events.eventStartAt,
+      location: events.location,
+      reserveUrl: events.reserveUrl,
+      institutionId: institutions.id,
+      institutionName: institutions.name,
     })
     .from(favorites)
     .innerJoin(events, eq(favorites.targetId, events.id))
@@ -56,7 +57,33 @@ favoritesRoute.get("/", async (c) => {
     .where(and(eq(favorites.userId, userId), eq(favorites.targetType, "event")))
     .orderBy(desc(favorites.createdAt));
 
-  return c.json({ courses: courseFavs, events: eventFavs });
+  return c.json({
+    courses: courseRows.map((r) => ({
+      id: r.favId,
+      createdAt: r.favCreatedAt,
+      target: {
+        id: r.courseId,
+        title: r.title,
+        status: r.status,
+        startDate: r.startDate,
+        applyEndAt: r.applyEndAt,
+        applyUrl: r.applyUrl,
+        institution: { id: r.institutionId, name: r.institutionName },
+      },
+    })),
+    events: eventRows.map((r) => ({
+      id: r.favId,
+      createdAt: r.favCreatedAt,
+      target: {
+        id: r.eventId,
+        title: r.title,
+        eventStartAt: r.eventStartAt,
+        location: r.location,
+        reserveUrl: r.reserveUrl,
+        institution: { id: r.institutionId, name: r.institutionName },
+      },
+    })),
+  });
 });
 
 favoritesRoute.post(

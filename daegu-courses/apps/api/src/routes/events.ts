@@ -39,7 +39,7 @@ eventsRoute.get(
           : asc(events.eventStartAt);
     const offset = (q.page - 1) * q.pageSize;
 
-    const [rows, [{ total }]] = await Promise.all([
+    const [rows, totalRow] = await Promise.all([
       db
         .select({
           id: events.id,
@@ -72,6 +72,7 @@ eventsRoute.get(
         .innerJoin(institutions, eq(events.institutionId, institutions.id))
         .where(where),
     ]);
+    const total = totalRow[0]?.total ?? 0;
 
     const body: ListResponse<(typeof rows)[number]> = {
       items: rows,

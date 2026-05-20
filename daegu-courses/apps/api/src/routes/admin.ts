@@ -245,24 +245,16 @@ adminRoute.get("/crawl-logs", async (c) => {
   return c.json({ items: rows });
 });
 
-adminRoute.get("/stats", async (_c) => {
-  const [{ instCount }] = await db
-    .select({ instCount: countStar() })
-    .from(institutions);
-  const [{ srcCount }] = await db
-    .select({ srcCount: countStar() })
-    .from(crawlSources);
-  const [{ courseCount }] = await db
-    .select({ courseCount: countStar() })
-    .from(courses);
-  const [{ eventCount }] = await db
-    .select({ eventCount: countStar() })
-    .from(events);
-  return _c.json({
-    institutions: Number(instCount),
-    crawlSources: Number(srcCount),
-    courses: Number(courseCount),
-    events: Number(eventCount),
+adminRoute.get("/stats", async (c) => {
+  const [instRow] = await db.select({ n: countStar() }).from(institutions);
+  const [srcRow] = await db.select({ n: countStar() }).from(crawlSources);
+  const [courseRow] = await db.select({ n: countStar() }).from(courses);
+  const [eventRow] = await db.select({ n: countStar() }).from(events);
+  return c.json({
+    institutions: Number(instRow?.n ?? 0),
+    crawlSources: Number(srcRow?.n ?? 0),
+    courses: Number(courseRow?.n ?? 0),
+    events: Number(eventRow?.n ?? 0),
   });
 });
 

@@ -405,37 +405,42 @@ async function main() {
 
   const slugToId = new Map<string, string>();
   for (const inst of INSTITUTIONS) {
-    let [existing] = await db.select({ id: institutions.id }).from(institutions).where(eq(institutions.slug, inst.slug));
+    let existing = (
+      await db.select({ id: institutions.id }).from(institutions).where(eq(institutions.slug, inst.slug))
+    )[0];
     if (!existing) {
-      [existing] = await db
-        .insert(institutions)
-        .values({
-          slug: inst.slug,
-          name: inst.name,
-          type: inst.type,
-          district: inst.district,
-          homepageUrl: inst.homepageUrl,
-        })
-        .returning({ id: institutions.id });
+      existing = (
+        await db
+          .insert(institutions)
+          .values({
+            slug: inst.slug,
+            name: inst.name,
+            type: inst.type,
+            district: inst.district,
+            homepageUrl: inst.homepageUrl,
+          })
+          .returning({ id: institutions.id })
+      )[0];
+      if (!existing) throw new Error(`failed to insert institution ${inst.slug}`);
     }
     slugToId.set(inst.slug, existing.id);
   }
 
   const sourceIdByInst = new Map<string, string>();
   for (const [slug, id] of slugToId) {
-    let [src] = await db
-      .select()
-      .from(crawlSources)
-      .where(eq(crawlSources.institutionId, id));
+    let src = (await db.select().from(crawlSources).where(eq(crawlSources.institutionId, id)))[0];
     if (!src) {
-      [src] = await db
-        .insert(crawlSources)
-        .values({
-          institutionId: id,
-          sourceUrl: `https://example.invalid/${slug}/courses`,
-          adapterKey: "daegu-library-v1",
-        })
-        .returning();
+      src = (
+        await db
+          .insert(crawlSources)
+          .values({
+            institutionId: id,
+            sourceUrl: `https://example.invalid/${slug}/courses`,
+            adapterKey: "daegu-library-v1",
+          })
+          .returning()
+      )[0];
+      if (!src) throw new Error(`failed to insert crawl_source for ${slug}`);
     }
     sourceIdByInst.set(slug, src.id);
   }
